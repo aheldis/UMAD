@@ -186,8 +186,8 @@ class BasicEncoder(nn.Module):
         if self.training and self.dropout is not None:
             x = self.dropout(x)
 
-        if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
+        # if is_list:
+        #     x = torch.split(x, [batch_dim, batch_dim], dim=0)
 
         return x
 
@@ -261,7 +261,7 @@ class SmallEncoder(nn.Module):
         if self.training and self.dropout is not None:
             x = self.dropout(x)
 
-        if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
+        # if is_list:
+        #     x = torch.split(x, [batch_dim, batch_dim], dim=0)
 
         return x

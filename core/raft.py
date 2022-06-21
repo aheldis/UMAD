@@ -7,6 +7,7 @@ from update import BasicUpdateBlock, SmallUpdateBlock
 from extractor import BasicEncoder, SmallEncoder
 from corr import CorrBlock, AlternateCorrBlock
 from utils.utils import bilinear_sampler, coords_grid, upflow8
+from attention import CBAM
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -46,14 +47,18 @@ class RAFT(nn.Module):
 
         # feature network, context network, and update block
         if args.small:
-            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)        
+            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)
+            self.fcbam = CBAM(128)        
             self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout)
             self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)
 
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        
+            self.fcbam = CBAM(256)        
             self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+          
+        self.ccbam = CBAM(hdim+cdim)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -97,7 +102,10 @@ class RAFT(nn.Module):
 
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
-            fmap1, fmap2 = self.fnet([image1, image2])        
+            fnet = self.fnet([image1, image2])        
+            fnet = self.fcbam(fnet)
+            batch_dim = image1.shape[0]
+            fmap1, fmap2 = torch.split(fnet, [batch_dim, batch_dim], dim=0)
         
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
@@ -109,6 +117,7 @@ class RAFT(nn.Module):
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
             cnet = self.cnet(image1)
+            cnet = self.ccbam(cnet)
             net, inp = torch.split(cnet, [hdim, cdim], dim=1)
             net = torch.tanh(net)
             inp = torch.relu(inp)
