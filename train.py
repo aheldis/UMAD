@@ -7,6 +7,7 @@ import os
 import cv2
 import time
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 import torch
@@ -209,7 +210,7 @@ def train(args):
 
     logger.close()
     PATH = 'checkpoints/%s.pth' % args.name
-    torch.save(model.state_dict(), PATH)
+    # torch.save(model.state_dict(), PATH)
 
     return PATH
 
@@ -240,7 +241,7 @@ if __name__ == '__main__':
 
     torch.manual_seed(1234)
     np.random.seed(1234)
-
+    
     if not os.path.isdir('checkpoints'):
         os.mkdir('checkpoints')
 

@@ -1,24 +1,25 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from deform import DeformableConv2d as Deform
 
 
 class FlowHead(nn.Module):
-    def __init__(self, input_dim=128, hidden_dim=256):
+    def __init__(self, input_dim=128, hidden_dim=256, deform_bool=False):
         super(FlowHead, self).__init__()
-        self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)
+        self.conv1 = Deform(input_dim, hidden_dim, 3, padding=1) if deform_bool else nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
+        self.conv2 = Deform(hidden_dim, 2, 3, padding=1) if deform_bool else nn.Conv2d(hidden_dim, 2, 3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x)))
 
 class ConvGRU(nn.Module):
-    def __init__(self, hidden_dim=128, input_dim=192+128):
+    def __init__(self, hidden_dim=128, input_dim=192+128, deform_bool=False):
         super(ConvGRU, self).__init__()
-        self.convz = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
-        self.convr = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
-        self.convq = nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
+        self.convz = Deform(hidden_dim+input_dim, hidden_dim, 3, padding=1) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
+        self.convr = Deform(hidden_dim+input_dim, hidden_dim, 3, padding=1) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
+        self.convq = Deform(hidden_dim+input_dim, hidden_dim, 3, padding=1) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, 3, padding=1)
 
     def forward(self, h, x):
         hx = torch.cat([h, x], dim=1)
@@ -31,15 +32,15 @@ class ConvGRU(nn.Module):
         return h
 
 class SepConvGRU(nn.Module):
-    def __init__(self, hidden_dim=128, input_dim=192+128):
+    def __init__(self, hidden_dim=128, input_dim=192+128, deform_bool=False):
         super(SepConvGRU, self).__init__()
-        self.convz1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
-        self.convr1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
-        self.convq1 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
+        self.convz1 = Deform(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
+        self.convr1 = Deform(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
+        self.convq1 = Deform(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (1,5), padding=(0,2))
 
-        self.convz2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
-        self.convr2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
-        self.convq2 = nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
+        self.convz2 = Deform(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
+        self.convr2 = Deform(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
+        self.convq2 = Deform(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0)) if deform_bool else nn.Conv2d(hidden_dim+input_dim, hidden_dim, (5,1), padding=(2,0))
 
 
     def forward(self, h, x):
@@ -60,13 +61,13 @@ class SepConvGRU(nn.Module):
         return h
 
 class SmallMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, deform_bool=False):
         super(SmallMotionEncoder, self).__init__()
         cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2
-        self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)
-        self.convf1 = nn.Conv2d(2, 64, 7, padding=3)
-        self.convf2 = nn.Conv2d(64, 32, 3, padding=1)
-        self.conv = nn.Conv2d(128, 80, 3, padding=1)
+        self.convc1 = Deform(cor_planes, 96, 1, padding=0) if deform_bool else nn.Conv2d(cor_planes, 96, 1, padding=0)
+        self.convf1 = Deform(2, 64, 7, padding=3) if deform_bool else nn.Conv2d(2, 64, 7, padding=3)
+        self.convf2 = Deform(64, 32, 3, padding=1) if deform_bool else nn.Conv2d(64, 32, 3, padding=1)
+        self.conv = Deform(128, 80, 3, padding=1) if deform_bool else nn.Conv2d(128, 80, 3, padding=1)
 
     def forward(self, flow, corr):
         cor = F.relu(self.convc1(corr))
@@ -77,14 +78,14 @@ class SmallMotionEncoder(nn.Module):
         return torch.cat([out, flow], dim=1)
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, deform_bool=False):
         super(BasicMotionEncoder, self).__init__()
         cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2
-        self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
-        self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
-        self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
-        self.convf2 = nn.Conv2d(128, 64, 3, padding=1)
-        self.conv = nn.Conv2d(64+192, 128-2, 3, padding=1)
+        self.convc1 = Deform(cor_planes, 256, 1, padding=0) if deform_bool else nn.Conv2d(cor_planes, 256, 1, padding=0)
+        self.convc2 = Deform(256, 192, 3, padding=1) if deform_bool else nn.Conv2d(256, 192, 3, padding=1)
+        self.convf1 = Deform(2, 128, 7, padding=3) if deform_bool else nn.Conv2d(2, 128, 7, padding=3)
+        self.convf2 = Deform(128, 64, 3, padding=1) if deform_bool else nn.Conv2d(128, 64, 3, padding=1)
+        self.conv = Deform(64+192, 128-2, 3, padding=1) if deform_bool else nn.Conv2d(64+192, 128-2, 3, padding=1)
 
     def forward(self, flow, corr):
         cor = F.relu(self.convc1(corr))
@@ -97,11 +98,11 @@ class BasicMotionEncoder(nn.Module):
         return torch.cat([out, flow], dim=1)
 
 class SmallUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=96):
+    def __init__(self, args, hidden_dim=96, deform_bool=False):
         super(SmallUpdateBlock, self).__init__()
-        self.encoder = SmallMotionEncoder(args)
-        self.gru = ConvGRU(hidden_dim=hidden_dim, input_dim=82+64)
-        self.flow_head = FlowHead(hidden_dim, hidden_dim=128)
+        self.encoder = SmallMotionEncoder(args, deform_bool=deform_bool)
+        self.gru = ConvGRU(hidden_dim=hidden_dim, input_dim=82+64, deform_bool=deform_bool)
+        self.flow_head = FlowHead(hidden_dim, hidden_dim=128, deform_bool=deform_bool)
 
     def forward(self, net, inp, corr, flow):
         motion_features = self.encoder(flow, corr)
@@ -112,14 +113,17 @@ class SmallUpdateBlock(nn.Module):
         return net, None, delta_flow
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, args, hidden_dim=128, input_dim=128, deform_bool=False):
         super(BasicUpdateBlock, self).__init__()
         self.args = args
-        self.encoder = BasicMotionEncoder(args)
-        self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128+hidden_dim)
-        self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
+        self.encoder = BasicMotionEncoder(args, deform_bool=deform_bool)
+        self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128+hidden_dim, deform_bool=deform_bool)
+        self.flow_head = FlowHead(hidden_dim, hidden_dim=256, deform_bool=deform_bool)
 
         self.mask = nn.Sequential(
+            Deform(128, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            Deform(256, 64*9, 1, padding=0)) if deform_bool else nn.Sequential(
             nn.Conv2d(128, 256, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(256, 64*9, 1, padding=0))

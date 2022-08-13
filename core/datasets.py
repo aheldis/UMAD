@@ -227,8 +227,27 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
         aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.4, 'do_flip': False}
         train_dataset = KITTI(aug_params, split='training')
 
+
+    torch.backends.cudnn.deterministic = True
+    random.seed(1234)
+    torch.manual_seed(1234)
+    torch.cuda.manual_seed(1234)
+    np.random.seed(1234)
+
+    def seed_worker(worker_id):
+      seeds = [1, 2, 3, 4]
+      worker_seed = seeds[worker_id]
+      np.random.seed(seeds[worker_id])
+      random.seed(seeds[worker_id])
+
+    g = torch.Generator()
+    g.manual_seed(0)
+
+
     train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, 
-        pin_memory=False, shuffle=True, num_workers=4, drop_last=True)
+        pin_memory=False, shuffle=True, drop_last=True, num_workers=2,
+        worker_init_fn=seed_worker, generator=g)
+
 
     print('Training with %d image pairs' % len(train_dataset))
     return train_loader

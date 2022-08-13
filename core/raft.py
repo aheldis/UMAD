@@ -26,6 +26,7 @@ class RAFT(nn.Module):
     def __init__(self, args):
         super(RAFT, self).__init__()
         self.args = args
+        deform_bool = False
 
         if args.small:
             self.hidden_dim = hdim = 96
@@ -45,18 +46,19 @@ class RAFT(nn.Module):
         if 'alternate_corr' not in self.args:
             self.args.alternate_corr = False
 
+
         # feature network, context network, and update block
         if args.small:
-            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)
+            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout, deform_bool=deform_bool)
             self.fcbam = CBAM(128)        
-            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout)
-            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)
+            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout, deform_bool=deform_bool)
+            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
 
         else:
-            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        
+            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout, deform_bool=deform_bool)        
             self.fcbam = CBAM(256)        
-            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)
-            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout, deform_bool=deform_bool)
+            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
           
         self.ccbam = CBAM(hdim+cdim)
 

@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from deform import DeformableConv2d as Deform
 
 class ResidualBlock(nn.Module):
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn='group', stride=1, deform_bool=False):
         super(ResidualBlock, self).__init__()
-  
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
+        self.conv1 = Deform(in_planes, planes, kernel_size=3, padding=1, stride=stride) if deform_bool else nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
+        self.conv2 = Deform(planes, planes, kernel_size=3, padding=1) if deform_bool else nn.Conv2d(planes, planes, kernel_size=3, padding=1) 
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
@@ -58,12 +57,12 @@ class ResidualBlock(nn.Module):
 
 
 class BottleneckBlock(nn.Module):
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn='group', stride=1, deform_bool=False):
         super(BottleneckBlock, self).__init__()
   
-        self.conv1 = nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0)
-        self.conv2 = nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride)
-        self.conv3 = nn.Conv2d(planes//4, planes, kernel_size=1, padding=0)
+        self.conv1 = Deform(in_planes, planes//4, kernel_size=1, padding=0) if deform_bool else nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0)
+        self.conv2 = Deform(planes//4, planes//4, kernel_size=3, padding=1, stride=stride) if deform_bool else nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride)
+        self.conv3 = Deform(planes//4, planes, kernel_size=1, padding=0) if deform_bool else nn.Conv2d(planes//4, planes, kernel_size=1, padding=0)
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
@@ -116,9 +115,10 @@ class BottleneckBlock(nn.Module):
         return self.relu(x+y)
 
 class BasicEncoder(nn.Module):
-    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0, deform_bool=False):
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn
+        self.deform_bool = deform_bool
 
         if self.norm_fn == 'group':
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=64)
@@ -132,7 +132,7 @@ class BasicEncoder(nn.Module):
         elif self.norm_fn == 'none':
             self.norm1 = nn.Sequential()
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.conv1 = Deform(3, 64, kernel_size=7, stride=2, padding=3) if deform_bool else nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
         self.relu1 = nn.ReLU(inplace=True)
 
         self.in_planes = 64
@@ -141,7 +141,7 @@ class BasicEncoder(nn.Module):
         self.layer3 = self._make_layer(128, stride=2)
 
         # output convolution
-        self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
+        self.conv2 = Deform(128, output_dim, kernel_size=1) if deform_bool else nn.Conv2d(128, output_dim, kernel_size=1)
 
         self.dropout = None
         if dropout > 0:
@@ -157,8 +157,8 @@ class BasicEncoder(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
+        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=self.deform_bool)
+        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1, deform_bool=self.deform_bool)
         layers = (layer1, layer2)
         
         self.in_planes = dim
@@ -193,9 +193,10 @@ class BasicEncoder(nn.Module):
 
 
 class SmallEncoder(nn.Module):
-    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0, deform_bool=False):
         super(SmallEncoder, self).__init__()
         self.norm_fn = norm_fn
+        self.deform_bool = deform_bool
 
         if self.norm_fn == 'group':
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=32)
@@ -209,7 +210,7 @@ class SmallEncoder(nn.Module):
         elif self.norm_fn == 'none':
             self.norm1 = nn.Sequential()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
+        self.conv1 = Deform(3, 32, kernel_size=7, stride=2, padding=3) if deform_bool else nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
         self.relu1 = nn.ReLU(inplace=True)
 
         self.in_planes = 32
@@ -221,7 +222,7 @@ class SmallEncoder(nn.Module):
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
         
-        self.conv2 = nn.Conv2d(96, output_dim, kernel_size=1)
+        self.conv2 = Deform(96, output_dim, kernel_size=1) if deform_bool else nn.Conv2d(96, output_dim, kernel_size=1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -233,8 +234,8 @@ class SmallEncoder(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1)
+        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=self.deform_bool)
+        layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1, deform_bool=self.deform_bool)
         layers = (layer1, layer2)
     
         self.in_planes = dim
