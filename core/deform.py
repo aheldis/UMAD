@@ -9,7 +9,10 @@ class DeformableConv2d(nn.Module):
                  kernel_size=3,
                  stride=1,
                  padding=1,
-                 bias=False):
+                 padding_mode='zeros',
+                 dilation=1,
+                 groups=1,
+                 bias=True):
 
         super(DeformableConv2d, self).__init__()
         
@@ -45,10 +48,12 @@ class DeformableConv2d(nn.Module):
                                       stride=stride,
                                       padding=self.padding,
                                       bias=bias)
+        self.weight = self.regular_conv.weight
+
 
     def forward(self, x):
-        #h, w = x.shape[2:]
-        #max_offset = max(h, w)/4.
+        # h, w = x.shape[2:]
+        # max_offset = max(h, w)/4.
 
         offset = self.offset_conv(x)#.clamp(-max_offset, max_offset)
         modulator = 2. * torch.sigmoid(self.modulator_conv(x))

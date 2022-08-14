@@ -39,8 +39,9 @@ class ResidualBlock(nn.Module):
         if stride == 1:
             self.downsample = None
         
-        else:    
+        else:
             self.downsample = nn.Sequential(
+                Deform(in_planes, planes, kernel_size=1, stride=stride), self.norm3) if deform_bool else nn.Sequential(
                 nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
 
 
@@ -100,7 +101,8 @@ class BottleneckBlock(nn.Module):
         
         else:    
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4)
+                Deform(in_planes, planes, kernel_size=1, stride=stride), self.norm4) if deform_bool else nn.Sequential(
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
 
 
     def forward(self, x):
@@ -114,11 +116,11 @@ class BottleneckBlock(nn.Module):
 
         return self.relu(x+y)
 
+
 class BasicEncoder(nn.Module):
     def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0, deform_bool=False):
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn
-        self.deform_bool = deform_bool
 
         if self.norm_fn == 'group':
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=64)
@@ -136,9 +138,9 @@ class BasicEncoder(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
 
         self.in_planes = 64
-        self.layer1 = self._make_layer(64,  stride=1)
-        self.layer2 = self._make_layer(96, stride=2)
-        self.layer3 = self._make_layer(128, stride=2)
+        self.layer1 = self._make_layer(64,  stride=1, deform_bool=deform_bool)
+        self.layer2 = self._make_layer(96, stride=2, deform_bool=deform_bool)
+        self.layer3 = self._make_layer(128, stride=2, deform_bool=deform_bool)
 
         # output convolution
         self.conv2 = Deform(128, output_dim, kernel_size=1) if deform_bool else nn.Conv2d(128, output_dim, kernel_size=1)
@@ -148,7 +150,7 @@ class BasicEncoder(nn.Module):
             self.dropout = nn.Dropout2d(p=dropout)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv2d) or isinstance(m, Deform):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
@@ -156,9 +158,9 @@ class BasicEncoder(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=self.deform_bool)
-        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1, deform_bool=self.deform_bool)
+    def _make_layer(self, dim, stride=1, deform_bool=False):
+        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=deform_bool)
+        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1, deform_bool=deform_bool)
         layers = (layer1, layer2)
         
         self.in_planes = dim
@@ -196,7 +198,6 @@ class SmallEncoder(nn.Module):
     def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0, deform_bool=False):
         super(SmallEncoder, self).__init__()
         self.norm_fn = norm_fn
-        self.deform_bool = deform_bool
 
         if self.norm_fn == 'group':
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=32)
@@ -214,9 +215,9 @@ class SmallEncoder(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
 
         self.in_planes = 32
-        self.layer1 = self._make_layer(32,  stride=1)
-        self.layer2 = self._make_layer(64, stride=2)
-        self.layer3 = self._make_layer(96, stride=2)
+        self.layer1 = self._make_layer(32, stride=1, deform_bool=deform_bool)
+        self.layer2 = self._make_layer(64, stride=2, deform_bool=deform_bool)
+        self.layer3 = self._make_layer(96, stride=2, deform_bool=deform_bool)
 
         self.dropout = None
         if dropout > 0:
@@ -225,7 +226,7 @@ class SmallEncoder(nn.Module):
         self.conv2 = Deform(96, output_dim, kernel_size=1) if deform_bool else nn.Conv2d(96, output_dim, kernel_size=1)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv2d) or isinstance(m, Deform):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
@@ -233,9 +234,9 @@ class SmallEncoder(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def _make_layer(self, dim, stride=1):
-        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=self.deform_bool)
-        layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1, deform_bool=self.deform_bool)
+    def _make_layer(self, dim, stride=1, deform_bool=False):
+        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride, deform_bool=deform_bool)
+        layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1, deform_bool=deform_bool)
         layers = (layer1, layer2)
     
         self.in_planes = dim
