@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-import datasets
+import core.datasets as datasets
 from utils import flow_viz
 from utils import frame_utils
 

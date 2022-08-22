@@ -201,7 +201,7 @@ def train(args):
                 model.train()
                 if args.stage != 'chairs':
                     model.module.freeze_bn()
-            
+                should_keep_training = False
             total_steps += 1
 
             if total_steps > args.num_steps:
