@@ -201,7 +201,7 @@ def train(args):
                 model.train()
                 if args.stage != 'chairs':
                     model.module.freeze_bn()
-                should_keep_training = False
+                # should_keep_training = False
             total_steps += 1
 
             if total_steps > args.num_steps:
@@ -210,7 +210,7 @@ def train(args):
 
     logger.close()
     PATH = 'checkpoints/%s.pth' % args.name
-    # torch.save(model.state_dict(), PATH)
+    torch.save(model.state_dict(), PATH)
 
     return PATH
 
