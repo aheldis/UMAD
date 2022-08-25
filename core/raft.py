@@ -26,7 +26,7 @@ class RAFT(nn.Module):
     def __init__(self, args):
         super(RAFT, self).__init__()
         self.args = args
-        deform_bool = True
+        deform_bool = False
 
         if args.small:
             self.hidden_dim = hdim = 96
@@ -105,7 +105,7 @@ class RAFT(nn.Module):
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
             fnet = self.fnet([image1, image2])        
-            # fnet = self.fcbam(fnet)
+            fnet = self.fcbam(fnet)
             batch_dim = image1.shape[0]
             fmap1, fmap2 = torch.split(fnet, [batch_dim, batch_dim], dim=0)
         
