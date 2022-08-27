@@ -105,7 +105,7 @@ class RAFT(nn.Module):
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
             fnet = self.fnet([image1, image2])        
-            fnet = self.fcbam(fnet)
+            # fnet = self.fcbam(fnet)
             batch_dim = image1.shape[0]
             fmap1, fmap2 = torch.split(fnet, [batch_dim, batch_dim], dim=0)
         
@@ -119,7 +119,7 @@ class RAFT(nn.Module):
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
             cnet = self.cnet(image1)
-            # cnet = self.ccbam(cnet)
+            cnet = self.ccbam(cnet)
             net, inp = torch.split(cnet, [hdim, cdim], dim=1)
             net = torch.tanh(net)
             inp = torch.relu(inp)

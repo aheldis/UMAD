@@ -88,10 +88,10 @@ def fetch_optimizer(args, model):
     
 
 class Logger:
-    def __init__(self, model, scheduler):
+    def __init__(self, model, scheduler, total_steps):
         self.model = model
         self.scheduler = scheduler
-        self.total_steps = 0
+        self.total_steps = total_steps
         self.running_loss = {}
         self.writer = None
 
@@ -152,8 +152,18 @@ def train(args):
     optimizer, scheduler = fetch_optimizer(args, model)
 
     total_steps = 0
+
     scaler = GradScaler(enabled=args.mixed_precision)
-    logger = Logger(model, scheduler)
+
+    if args.cont is not None:
+        checkpoint = torch.load(args.cont)
+        total_steps = checkpoint['step']
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        scaler.load_state_dict(checkpoint['scaler_state_dict'])
+
+    logger = Logger(model, scheduler, total_steps)
 
     VAL_FREQ = 5000
     add_noise = True
@@ -182,10 +192,28 @@ def train(args):
             scaler.update()
 
             logger.push(metrics)
+            
+            if (total_steps + 1)  % SUM_FREQ == SUM_FREQ-1:
+              torch.save({
+              'step': total_steps,
+              'model_state_dict': model.state_dict(),
+              'optimizer_state_dict': optimizer.state_dict(),
+              'scheduler_state_dict': scheduler.state_dict(),
+              'scaler_state_dict': scaler.state_dict(),
+              }, 'checkpoints/last.pth')
+
+            PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
                 PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
-                torch.save(model.state_dict(), PATH)
+                torch.save({
+                'step': total_steps,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict(),
+                }, PATH)
+                # torch.save(model.state_dict(), PATH)
 
                 results = {}
                 for val_dataset in args.validation:
@@ -210,7 +238,14 @@ def train(args):
 
     logger.close()
     PATH = 'checkpoints/%s.pth' % args.name
-    torch.save(model.state_dict(), PATH)
+    # torch.save(model.state_dict(), PATH)
+    torch.save({
+                'step': total_steps,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict(),
+                }, PATH)
 
     return PATH
 
@@ -220,6 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='raft', help="name your experiment")
     parser.add_argument('--stage', help="determines which dataset to use for training") 
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
+    parser.add_argument('--cont', help="continue training from checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--validation', type=str, nargs='+')
 
