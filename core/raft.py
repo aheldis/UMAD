@@ -26,7 +26,7 @@ class RAFT(nn.Module):
     def __init__(self, args):
         super(RAFT, self).__init__()
         self.args = args
-        deform_bool = False
+        deform_bool = True
 
         if args.small:
             self.hidden_dim = hdim = 96
