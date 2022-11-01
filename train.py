@@ -43,6 +43,10 @@ except:
 MAX_FLOW = 400
 SUM_FREQ = 100
 VAL_FREQ = 5000
+# class_boundary = list(np.arange(1, 400, 400//10))
+class_boundary = list(np.arange(0, 16, 2))
+class_boundary.append(400)
+print(class_boundary)
 
 
 def sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=MAX_FLOW):
@@ -52,18 +56,37 @@ def sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=MAX_FLOW):
     flow_loss = 0.0
 
     # exlude invalid pixels and extremely large diplacements
+    # print(flow_gt.shape)
     mag = torch.sum(flow_gt**2, dim=1).sqrt()
     valid = (valid >= 0.5) & (mag < max_flow)
 
+    mag = torch.unsqueeze(mag, 1)
+    mag = torch.tile(mag, (1, 2, 1, 1))
+    # class_gt = torch.zeros_like(mag)
+    # print(mag.shape, flow_gt.shape)
+    # for i in range(len(class_boundary) - 1):
+    #     class_gt += torch.where((class_boundary[i] < mag) & (mag < class_boundary[i + 1]), len(class_boundary) - i, 0)
+
     for i in range(n_predictions):
+        # loss = nn.CrossEntropyLoss()
+        # cross_entropy = loss(class_gt, flow_preds[i])
+            
         i_weight = gamma**(n_predictions - i - 1)
-        i_loss = (flow_preds[i] - flow_gt).abs()
+        
+        # i_loss = (flow_preds[i] - flow_gt).abs()
+        # i_loss = (flow_preds[i] - flow_gt)**2
+        cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        i_loss = -cos(flow_preds[i], flow_gt)
         flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
-    epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
+
+    epe = torch.sum((flow_preds[-2] - flow_gt)**2, dim=1).sqrt()
     epe = epe.view(-1)[valid.view(-1)]
 
+    # cross_entropy = loss(class_gt, flow_preds[-1])
+
     metrics = {
+        # 'loss': flow_loss.item(),
         'epe': epe.mean().item(),
         '1px': (epe < 1).float().mean().item(),
         '3px': (epe < 3).float().mean().item(),

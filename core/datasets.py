@@ -100,7 +100,7 @@ class FlowDataset(data.Dataset):
         
 
 class MpiSintel(FlowDataset):
-    def __init__(self, aug_params=None, split='training', root='../sintel', dstype='clean'):
+    def __init__(self, aug_params=None, split='training', root='../sintel', dstype='clean', train=True):
         super(MpiSintel, self).__init__(aug_params)
         flow_root = osp.join(root, split, 'flow')
         image_root = osp.join(root, split, dstype)
@@ -109,14 +109,15 @@ class MpiSintel(FlowDataset):
             self.is_test = True
 
         for scene in os.listdir(image_root):
-            if not (scene.startswith('ambush')):
+            if (not scene.startswith('ambush')) and train:
+                continue
+            if scene.startswith('ambush') and not train:
                 continue
             print("scene:", scene)
             image_list = sorted(glob(osp.join(image_root, scene, '*.png')))
             for i in range(len(image_list)-1):
                 self.image_list += [ [image_list[i], image_list[i+1]] ]
                 self.extra_info += [ (scene, i) ] # scene and frame_id
-
             if split != 'test':
                 self.flow_list += sorted(glob(osp.join(flow_root, scene, '*.flo')))
 

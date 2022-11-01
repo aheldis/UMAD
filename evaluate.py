@@ -93,12 +93,12 @@ def validate_chairs(model, iters=24):
 
 
 @torch.no_grad()
-def validate_sintel(model, iters=32):
+def validate_sintel(model, iters=32, train=True):
     """ Peform validation using the Sintel (train) split """
     model.eval()
     results = {}
     for dstype in ['clean', 'final']:
-        val_dataset = datasets.MpiSintel(split='training', dstype=dstype)
+        val_dataset = datasets.MpiSintel(split='training', dstype=dstype, train=train)
         epe_list = []
 
         for val_id in range(len(val_dataset)):
@@ -176,7 +176,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.model))
+
+    checkpoint = torch.load(args.model)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    # model.load_state_dict(torch.load(args.model))
 
     model.cuda()
     model.eval()
@@ -189,7 +192,7 @@ if __name__ == '__main__':
             validate_chairs(model.module)
 
         elif args.dataset == 'sintel':
-            validate_sintel(model.module)
+            validate_sintel(model.module, train=False)
 
         elif args.dataset == 'kitti':
             validate_kitti(model.module)
