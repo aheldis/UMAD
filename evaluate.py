@@ -92,11 +92,19 @@ def validate_chairs(model, iters=24):
     return {'chairs': epe}
 
 
-@torch.no_grad()
+def fgsm_attack(image, epsilon, data_grad):
+    sign_data_grad = data_grad.sign()
+    perturbed_image = image + epsilon*sign_data_grad
+    perturbed_image = torch.clamp(perturbed_image, 0, 255)
+    return perturbed_image
+
+
+# @torch.no_grad()
 def validate_sintel(model, iters=32, train=True):
     """ Peform validation using the Sintel (train) split """
     model.eval()
     results = {}
+    torch.set_grad_enabled(True) 
     for dstype in ['clean', 'final']:
         val_dataset = datasets.MpiSintel(split='training', dstype=dstype, train=train)
         epe_list = []
@@ -108,12 +116,25 @@ def validate_sintel(model, iters=32, train=True):
 
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
+            
+            image1.requires_grad = True # for attack
 
             flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+
+            # start attack
+            flow = padder.unpad(flow_pr[0])
+            epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+            model.zero_grad()
+            epe.mean().backward()
+            data_grad = image1.grad.data
+            image1 = fgsm_attack(image1, 10, data_grad)
+            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            # end attack
+
             flow = padder.unpad(flow_pr[0]).cpu()
 
             epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()
-            epe_list.append(epe.view(-1).numpy())
+            epe_list.append(epe.view(-1).detach().numpy())
 
         epe_all = np.concatenate(epe_list)
         epe = np.mean(epe_all)

@@ -73,10 +73,10 @@ def sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=MAX_FLOW):
             
         i_weight = gamma**(n_predictions - i - 1)
         
-        # i_loss = (flow_preds[i] - flow_gt).abs()
+        i_loss = (flow_preds[i] - flow_gt).abs()
         # i_loss = (flow_preds[i] - flow_gt)**2
-        cos = nn.CosineSimilarity(dim=1, eps=1e-6)
-        i_loss = -cos(flow_preds[i], flow_gt)
+        # cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        # i_loss = -cos(flow_preds[i], flow_gt)
         flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
 

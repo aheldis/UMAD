@@ -109,11 +109,11 @@ class MpiSintel(FlowDataset):
             self.is_test = True
 
         for scene in os.listdir(image_root):
-            if (not scene.startswith('ambush')) and train:
-                continue
-            if scene.startswith('ambush') and not train:
-                continue
-            print("scene:", scene)
+            # if (not scene.startswith('ambush')) and train:
+            #     continue
+            # if scene.startswith('ambush') and not train:
+            #     continue
+            # print("scene:", scene)
             image_list = sorted(glob(osp.join(image_root, scene, '*.png')))
             for i in range(len(image_list)-1):
                 self.image_list += [ [image_list[i], image_list[i+1]] ]

@@ -8,6 +8,7 @@ from extractor import BasicEncoder, SmallEncoder
 from corr import CorrBlock, AlternateCorrBlock
 from utils.utils import bilinear_sampler, coords_grid, upflow8
 from attention import CBAM
+import cv2
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -92,6 +93,15 @@ class RAFT(nn.Module):
 
     def forward(self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False):
         """ Estimate optical flow between pair of frames """
+        # image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2HSV)
+        # image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2HSV)
+
+        # image1[:,:,0] /= 179.0
+        # image2[:,:,0] /= 179.0
+        # image1[:,:,1:] /= 255.0
+        # image2[:,:,1:] /= 255.0
+        # image1 = 2 * (image1) - 1.0
+        # image2 = 2 * (image2) - 1.0
 
         image1 = 2 * (image1 / 255.0) - 1.0
         image2 = 2 * (image2 / 255.0) - 1.0
@@ -138,7 +148,7 @@ class RAFT(nn.Module):
             with autocast(enabled=self.args.mixed_precision):
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
 
-            # F(t+1) = F(t) + \Delta(t)
+            # F(t+1) = F(t) + Delta(t)
             coords1 = coords1 + delta_flow
 
             # upsample predictions
@@ -153,3 +163,4 @@ class RAFT(nn.Module):
             return coords1 - coords0, flow_up
             
         return flow_predictions
+
