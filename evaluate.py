@@ -198,9 +198,9 @@ if __name__ == '__main__':
 
     model = torch.nn.DataParallel(RAFT(args))
 
-    checkpoint = torch.load(args.model)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    # model.load_state_dict(torch.load(args.model))
+    # checkpoint = torch.load(args.model)
+    # model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(torch.load(args.model))
 
     model.cuda()
     model.eval()
