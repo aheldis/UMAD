@@ -51,17 +51,17 @@ class RAFT(nn.Module):
         # feature network, context network, and update block
         if args.small:
             self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout, deform_bool=False)
-            self.fcbam = CBAM(128)        
+            # self.fcbam = CBAM(128)        
             self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout, deform_bool=False)
             self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
 
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout, deform_bool=False)        
-            self.fcbam = CBAM(256)        
+            # self.fcbam = CBAM(256)        
             self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout, deform_bool=False)
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
           
-        self.ccbam = CBAM(hdim+cdim)
+        # self.ccbam = CBAM(hdim+cdim)
 
     def freeze_bn(self):
         for m in self.modules():
