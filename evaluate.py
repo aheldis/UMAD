@@ -117,18 +117,18 @@ def validate_sintel(model, iters=32, train=True):
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
             
-            image1.requires_grad = True # for attack
+            # image1.requires_grad = True # for attack
 
             flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
 
             # start attack
-            flow = padder.unpad(flow_pr[0])
-            epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-            model.zero_grad()
-            epe.mean().backward()
-            data_grad = image1.grad.data
-            image1 = fgsm_attack(image1, 10, data_grad)
-            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            # flow = padder.unpad(flow_pr[0])
+            # epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+            # model.zero_grad()
+            # epe.mean().backward()
+            # data_grad = image1.grad.data
+            # image1 = fgsm_attack(image1, 10, data_grad)
+            # flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
             # end attack
 
             flow = padder.unpad(flow_pr[0]).cpu()
