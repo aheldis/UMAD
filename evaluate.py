@@ -127,7 +127,7 @@ def validate_sintel(model, iters=32, train=True):
             model.zero_grad()
             epe.mean().backward()
             data_grad = image1.grad.data
-            image1[:, 0, :, :] = fgsm_attack(image1, 10, data_grad)[:, 0, :, :]
+            image1[:, 0, :, :].data = fgsm_attack(image1, 10, data_grad)[:, 0, :, :]
             flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
             # end attack
 
