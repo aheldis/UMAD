@@ -160,10 +160,10 @@ def validate_kitti(model, iters=24):
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
-        image1.requires_grad = True # for attack
 
         padder = InputPadder(image1.shape, mode='kitti')
         image1, image2 = padder.pad(image1, image2)
+        image1.requires_grad = True # for attack
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
