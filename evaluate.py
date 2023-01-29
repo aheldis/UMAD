@@ -148,10 +148,11 @@ def validate_sintel(model, iters=32, train=True):
     return results
 
 
-@torch.no_grad()
+# @torch.no_grad()
 def validate_kitti(model, iters=24):
     """ Peform validation using the KITTI-2015 (train) split """
     model.eval()
+    torch.set_grad_enabled(True) 
     val_dataset = datasets.KITTI(split='training')
 
     out_list, epe_list = [], []
@@ -159,11 +160,21 @@ def validate_kitti(model, iters=24):
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
+        image1.requires_grad = True # for attack
 
         padder = InputPadder(image1.shape, mode='kitti')
         image1, image2 = padder.pad(image1, image2)
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        # start attack
+        flow = padder.unpad(flow_pr[0])
+        epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+        model.zero_grad()
+        epe.mean().backward()
+        data_grad = image1.grad.data
+        image1.data = fgsm_attack(image1, 10, data_grad)
+        flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
         epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()
