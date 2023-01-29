@@ -172,7 +172,7 @@ def validate_kitti(model, iters=24):
         model.zero_grad()
         epe.mean().backward()
         data_grad = image1.grad.data
-        image1.data[:, 1, :, :] = fgsm_attack(image1, 10, data_grad)[:, 1, :, :]
+        image1.data[:, 2, :, :] = fgsm_attack(image1, 10, data_grad)[:, 2, :, :]
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
