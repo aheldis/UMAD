@@ -163,27 +163,30 @@ def validate_kitti(model, iters=24):
 
         padder = InputPadder(image1.shape, mode='kitti')
         image1, image2 = padder.pad(image1, image2)
-        image1.requires_grad = True # for attack
+        print(torch.min(image1), torch.max(image1))
+        if args.attack_type != 'None':
+            image1.requires_grad = True # for attack
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
-        if args.attack_type == 'FGSM':
-            epsilon = args.epsilon
-            pgd_iters = 1
-        else:
-            epsilon = args.epsilon // args.pgd
-            pgd_iters = args.iters
-        for iter in range(pgd_iters):
-            flow = padder.unpad(flow_pr[0])
-            epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-            model.zero_grad()
-            epe.mean().backward()
-            data_grad = image1.grad.data
-            if args.channel == -1:
-                image1.data = fgsm_attack(image1, epsilon, data_grad)
+        if args.attack_type != 'None':
+            if args.attack_type == 'FGSM':
+                epsilon = args.epsilon
+                pgd_iters = 1
             else:
-                image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
-            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+                epsilon = args.epsilon // args.pgd
+                pgd_iters = args.iters
+            for iter in range(pgd_iters):
+                flow = padder.unpad(flow_pr[0])
+                epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+                model.zero_grad()
+                epe.mean().backward()
+                data_grad = image1.grad.data
+                if args.channel == -1:
+                    image1.data = fgsm_attack(image1, epsilon, data_grad)
+                else:
+                    image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
+                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
