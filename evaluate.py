@@ -163,7 +163,7 @@ def validate_kitti(model, iters=24):
 
         padder = InputPadder(image1.shape, mode='kitti')
         image1, image2 = padder.pad(image1, image2)
-        print(torch.min(image1), torch.max(image1))
+        # print(torch.min(image1), torch.max(image1)) 0, 255
         if args.attack_type != 'None':
             image1.requires_grad = True # for attack
 
@@ -174,7 +174,7 @@ def validate_kitti(model, iters=24):
                 epsilon = args.epsilon
                 pgd_iters = 1
             else:
-                epsilon = args.epsilon // args.pgd_iters
+                epsilon = args.epsilon // args.iters
                 pgd_iters = args.iters
             for iter in range(pgd_iters):
                 flow = padder.unpad(flow_pr[0])
