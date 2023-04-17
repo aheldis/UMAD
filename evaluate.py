@@ -94,7 +94,7 @@ def validate_chairs(model, iters=24):
 
 def fgsm_attack(image, epsilon, data_grad):
     sign_data_grad = data_grad.sign()
-    perturbed_image = image + epsilon*sign_data_grad
+    perturbed_image = image + int(epsilon*sign_data_grad)
     perturbed_image = torch.clamp(perturbed_image, 0, 255)
     return perturbed_image
 
@@ -167,13 +167,23 @@ def validate_kitti(model, iters=24):
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
-        flow = padder.unpad(flow_pr[0])
-        epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-        model.zero_grad()
-        epe.mean().backward()
-        data_grad = image1.grad.data
-        image1.data[:, 2, :, :] = fgsm_attack(image1, 10, data_grad)[:, 2, :, :]
-        flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        if args.attack_type == 'FGSM':
+            epsilon = args.epsilon
+            iters = 1
+        else:
+            epsilon = args.epsilon // args.pgd
+            iters = args.iters
+        for iter in range(iters):
+            flow = padder.unpad(flow_pr[0])
+            epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+            model.zero_grad()
+            epe.mean().backward()
+            data_grad = image1.grad.data
+            if args.channel == -1:
+                image1.data = fgsm_attack(image1, 10, data_grad)
+            else:
+                image1.data[:, args.channel, :, :] = fgsm_attack(image1, 10, data_grad)[:, args.channel, :, :]
+            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
@@ -205,6 +215,10 @@ if __name__ == '__main__':
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', default='PGD')
+    parser.add_argument('--iters', help='Number of iters for PGD?', default=50)
+    parser.add_argument('--epsilon', help='epsilon?', default=10)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=-1)
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
