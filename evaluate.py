@@ -178,7 +178,7 @@ def validate_kitti(model, iters=24):
                 pgd_iters = args.iters
             flow = 0
             for iter in range(pgd_iters):
-                pre_flow = flow
+                prev = image1.data
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                 model.zero_grad()
@@ -189,7 +189,7 @@ def validate_kitti(model, iters=24):
                     image1.data = fgsm_attack(image1.data, epsilon, data_grad)
                 else:
                     image1.data[:, args.channel, :, :] = fgsm_attack(image1.data, epsilon, data_grad)[:, args.channel, :, :]
-                print(iter, ':', torch.sum(data_grad), torch.sum(flow), torch.sum(image1.data))
+                print(iter, ':', torch.sum(data_grad), torch.sum(flow), torch.sum(image1.data - prev))
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
