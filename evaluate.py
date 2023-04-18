@@ -182,6 +182,7 @@ def validate_kitti(model, iters=24):
                 model.zero_grad()
                 epe.mean().backward()
                 data_grad = image1.grad.data
+                print(iter, ':', torch.sum(data_grad), torch.sum(flow))
                 if args.channel == -1:
                     image1.data = fgsm_attack(image1, epsilon, data_grad)
                 else:
