@@ -96,7 +96,6 @@ def fgsm_attack(image, epsilon, data_grad):
     sign_data_grad = data_grad.sign()
     perturbed_image = image + epsilon*sign_data_grad
     perturbed_image = torch.clamp(perturbed_image, 0, 255)
-    print(torch.sum(perturbed_image - image))
     return perturbed_image
 
 
@@ -179,7 +178,6 @@ def validate_kitti(model, iters=24):
                 pgd_iters = args.iters
             flow = 0
             for iter in range(pgd_iters):
-                prev = image1.data
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                 model.zero_grad()
@@ -187,10 +185,9 @@ def validate_kitti(model, iters=24):
                 epe.mean().backward()
                 data_grad = image1.grad.data
                 if args.channel == -1:
-                    image1.data = fgsm_attack(image1.data, epsilon, data_grad)
+                    image1.data = fgsm_attack(image1, epsilon, data_grad)
                 else:
-                    image1.data[:, args.channel, :, :] = fgsm_attack(image1.data, epsilon, data_grad)[:, args.channel, :, :]
-                print(iter, ':', torch.sum(data_grad), torch.sum(flow), torch.sum(image1.data - prev))
+                    image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
@@ -226,7 +223,7 @@ if __name__ == '__main__':
     parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', default='PGD')
     parser.add_argument('--iters', help='Number of iters for PGD?', default=50)
     parser.add_argument('--epsilon', help='epsilon?', default=10)
-    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=0)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=-1)
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
