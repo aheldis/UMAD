@@ -182,7 +182,7 @@ def validate_kitti(model, iters=24):
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                 model.zero_grad()
-                image1.zero_grad()
+                image1.requires_grad = True
                 epe.mean().backward()
                 data_grad = image1.grad.data
                 print(iter, ':', torch.sum(data_grad), torch.sum(flow), torch.sum(image1))
