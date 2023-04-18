@@ -96,6 +96,7 @@ def fgsm_attack(image, epsilon, data_grad):
     sign_data_grad = data_grad.sign()
     perturbed_image = image + (epsilon*sign_data_grad).type(torch.int64)
     perturbed_image = torch.clamp(perturbed_image, 0, 255)
+    print(torch.sum(perturbed_image - image))
     return perturbed_image
 
 
