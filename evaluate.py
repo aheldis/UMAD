@@ -223,7 +223,7 @@ if __name__ == '__main__':
     parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', default='PGD')
     parser.add_argument('--iters', help='Number of iters for PGD?', default=50)
     parser.add_argument('--epsilon', help='epsilon?', default=10)
-    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=0)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=1)
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
