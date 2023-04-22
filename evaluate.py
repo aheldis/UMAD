@@ -117,9 +117,6 @@ def validate_sintel(model, iters=32, train=True):
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
 
-            if val_id == 0:
-                print(torch.min(image1), torch.max(image1))
-            
             if args.attack_type != 'None':
                 image1.requires_grad = True # for attack
 
@@ -133,12 +130,13 @@ def validate_sintel(model, iters=32, train=True):
                 else:
                     epsilon = args.epsilon / args.iters
                     pgd_iters = args.iters
-                flow = 0
+
                 for iter in range(pgd_iters):
                     flow = padder.unpad(flow_pr[0])
                     epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                     model.zero_grad()
                     image1.requires_grad = True
+                    print(epe.mean())
                     epe.mean().backward()
                     data_grad = image1.grad.data
                     if args.channel == -1:
@@ -193,7 +191,7 @@ def validate_kitti(model, iters=24):
             else:
                 epsilon = args.epsilon / args.iters
                 pgd_iters = args.iters
-            flow = 0
+        
             for iter in range(pgd_iters):
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
