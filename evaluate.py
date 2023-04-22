@@ -141,6 +141,7 @@ def validate_sintel(model, iters=32, train=True):
                     print(epe.mean())
                     epe.mean().backward()
                     data_grad = image1.grad.data
+                    args.channel = int(args.channel)
                     if args.channel == -1:
                         image1.data = fgsm_attack(image1, epsilon, data_grad)
                     else:
@@ -202,6 +203,7 @@ def validate_kitti(model, iters=24):
                 image1.requires_grad = True
                 epe.mean().backward()
                 data_grad = image1.grad.data
+                args.channel = int(args.channel)
                 if args.channel == -1:
                     image1.data = fgsm_attack(image1, epsilon, data_grad)
                 else:
@@ -234,18 +236,18 @@ def validate_kitti(model, iters=24):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="restore checkpoint")
-    parser.add_argument('--raft', help="checkpoint from the RAFT paper?", default=True)
+    parser.add_argument('--raft', help="checkpoint from the RAFT paper?", type=bool, default=True)
     parser.add_argument('--dataset', help="dataset for evaluation")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
-    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', default='PGD')
-    parser.add_argument('--iters', help='Number of iters for PGD?', default=50)
-    parser.add_argument('--epsilon', help='epsilon?', default=10)
-    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=-1)    
-    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', default=False)
-    parser.add_argument('--ccbam', help='Add CBAM after the context network?', default=False)
-    parser.add_argument('--deform', help='Add deformable convolution?', default=False)
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
+    parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50)
+    parser.add_argument('--epsilon', help='epsilon?', type=int, default=10)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)    
+    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
+    parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
+    parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
 
     args = parser.parse_args()
 

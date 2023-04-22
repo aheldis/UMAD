@@ -297,9 +297,9 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
     parser.add_argument('--add_noise', action='store_true')
 
-    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', default=False)
-    parser.add_argument('--ccbam', help='Add CBAM after the context network?', default=False)
-    parser.add_argument('--deform', help='Add deformable convolution?', default=False)
+    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
+    parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
+    parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
 
     args = parser.parse_args()
 
