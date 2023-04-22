@@ -27,7 +27,7 @@ class RAFT(nn.Module):
     def __init__(self, args):
         super(RAFT, self).__init__()
         self.args = args
-        deform_bool = False
+        deform_bool = args.deform
 
         if args.small:
             self.hidden_dim = hdim = 96
@@ -51,17 +51,20 @@ class RAFT(nn.Module):
         # feature network, context network, and update block
         if args.small:
             self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout, deform_bool=False)
-            # self.fcbam = CBAM(128)        
+            if args.fcbam:
+                self.fcbam = CBAM(128)        
             self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout, deform_bool=False)
             self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
 
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout, deform_bool=False)        
-            # self.fcbam = CBAM(256)        
+            if args.fcbam:
+                self.fcbam = CBAM(256)        
             self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout, deform_bool=False)
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
           
-        # self.ccbam = CBAM(hdim+cdim)
+        if args.ccbam:
+            self.ccbam = CBAM(hdim+cdim)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -114,8 +117,9 @@ class RAFT(nn.Module):
 
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
-            fnet = self.fnet([image1, image2])        
-            # fnet = self.fcbam(fnet)
+            fnet = self.fnet([image1, image2])      
+            if self.args.fcbam:  
+                fnet = self.fcbam(fnet)
             batch_dim = image1.shape[0]
             fmap1, fmap2 = torch.split(fnet, [batch_dim, batch_dim], dim=0)
         
@@ -129,7 +133,8 @@ class RAFT(nn.Module):
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
             cnet = self.cnet(image1)
-            # cnet = self.ccbam(cnet)
+            if self.args.ccbam:
+                cnet = self.ccbam(cnet)
             net, inp = torch.split(cnet, [hdim, cdim], dim=1)
             net = torch.tanh(net)
             inp = torch.relu(inp)

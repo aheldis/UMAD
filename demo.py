@@ -76,9 +76,11 @@ def viz(args, img, flo, name):
 
 def demo(args):
     model = torch.nn.DataParallel(RAFT(args))
-    # model.load_state_dict(torch.load(args.model))
-    checkpoint = torch.load(args.model)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    if not args.raft:
+        checkpoint = torch.load(args.model)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(torch.load(args.model))
 
     model = model.module
     model.to(DEVICE)
@@ -109,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
+    parser.add_argument('--raft', help="checkpoint from the RAFT paper?", default=True)
     args = parser.parse_args()
 
     demo(args)

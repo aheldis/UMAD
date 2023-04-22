@@ -116,19 +116,36 @@ def validate_sintel(model, iters=32, train=True):
 
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
+
+            if val_id == 0:
+                print(torch.min(image1), torch.max(image1))
             
-            # image1.requires_grad = True # for attack
+            if args.attack_type != 'None':
+                image1.requires_grad = True # for attack
 
             flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
 
             # start attack
-            # flow = padder.unpad(flow_pr[0])
-            # epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-            # model.zero_grad()
-            # epe.mean().backward()
-            # data_grad = image1.grad.data
-            # image1.data[:, 2, :, :] = fgsm_attack(image1, 10, data_grad)[:, 2, :, :]
-            # flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            if args.attack_type != 'None':
+                if args.attack_type == 'FGSM':
+                    epsilon = args.epsilon
+                    pgd_iters = 1
+                else:
+                    epsilon = args.epsilon / args.iters
+                    pgd_iters = args.iters
+                flow = 0
+                for iter in range(pgd_iters):
+                    flow = padder.unpad(flow_pr[0])
+                    epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+                    model.zero_grad()
+                    image1.requires_grad = True
+                    epe.mean().backward()
+                    data_grad = image1.grad.data
+                    if args.channel == -1:
+                        image1.data = fgsm_attack(image1, epsilon, data_grad)
+                    else:
+                        image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
+                    flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
             # end attack
 
             flow = padder.unpad(flow_pr[0]).cpu()
@@ -216,6 +233,7 @@ def validate_kitti(model, iters=24):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="restore checkpoint")
+    parser.add_argument('--raft', help="checkpoint from the RAFT paper?", default=True)
     parser.add_argument('--dataset', help="dataset for evaluation")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
@@ -223,14 +241,20 @@ if __name__ == '__main__':
     parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', default='PGD')
     parser.add_argument('--iters', help='Number of iters for PGD?', default=50)
     parser.add_argument('--epsilon', help='epsilon?', default=10)
-    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=2)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', default=-1)    
+    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', default=False)
+    parser.add_argument('--ccbam', help='Add CBAM after the context network?', default=False)
+    parser.add_argument('--deform', help='Add deformable convolution?', default=False)
+
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFT(args))
 
-    # checkpoint = torch.load(args.model)
-    # model.load_state_dict(checkpoint['model_state_dict'])
-    model.load_state_dict(torch.load(args.model))
+    if not args.raft:
+        checkpoint = torch.load(args.model)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(torch.load(args.model))
 
     model.cuda()
     model.eval()
