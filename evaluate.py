@@ -138,7 +138,7 @@ def validate_sintel(model, iters=32, train=True):
                     epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                     model.zero_grad()
                     image1.requires_grad = True
-                    print(epe.mean())
+                    # print(epe.mean())
                     epe.mean().backward()
                     data_grad = image1.grad.data
                     args.channel = int(args.channel)
