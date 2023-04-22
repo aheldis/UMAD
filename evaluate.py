@@ -104,7 +104,9 @@ def validate_sintel(model, iters=32, train=True):
     """ Peform validation using the Sintel (train) split """
     model.eval()
     results = {}
-    # torch.set_grad_enabled(True) 
+    if args.attack_type != 'None':
+        torch.set_grad_enabled(True)
+
     for dstype in ['clean', 'final']:
         val_dataset = datasets.MpiSintel(split='training', dstype=dstype, train=train)
         epe_list = []
@@ -167,7 +169,8 @@ def validate_sintel(model, iters=32, train=True):
 def validate_kitti(model, iters=24):
     """ Peform validation using the KITTI-2015 (train) split """
     model.eval()
-    torch.set_grad_enabled(True) 
+    if args.attack_type != 'None':
+        torch.set_grad_enabled(True) 
     val_dataset = datasets.KITTI(split='training')
 
     out_list, epe_list = [], []
