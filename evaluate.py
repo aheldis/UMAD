@@ -133,6 +133,7 @@ def validate_sintel(model, iters=32, train=True):
                     epsilon = args.epsilon / args.iters
                     pgd_iters = args.iters
 
+                ori = image1.data
                 for iter in range(pgd_iters):
                     flow = padder.unpad(flow_pr[0])
                     epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
@@ -146,6 +147,8 @@ def validate_sintel(model, iters=32, train=True):
                         image1.data = fgsm_attack(image1, epsilon, data_grad)
                     else:
                         image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
+                    if args.attack_type == 'PGD':
+                        image1.data = ori + torch.clamp(image1.data - ori, -args.epsilon, args.epsilon)
                     flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
             # end attack
 
@@ -196,6 +199,7 @@ def validate_kitti(model, iters=24):
                 epsilon = 2.5 * args.epsilon / args.iters
                 pgd_iters = args.iters
         
+            ori = image1.data
             for iter in range(pgd_iters):
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
@@ -208,6 +212,8 @@ def validate_kitti(model, iters=24):
                     image1.data = fgsm_attack(image1, epsilon, data_grad)
                 else:
                     image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
+                if args.attack_type == 'PGD':
+                    image1.data = ori + torch.clamp(image1.data - ori, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
