@@ -130,7 +130,7 @@ def validate_sintel(model, iters=32, train=True):
                     epsilon = args.epsilon
                     pgd_iters = 1
                 else:
-                    epsilon = args.epsilon / args.iters
+                    epsilon = 2.5 * args.epsilon / args.iters
                     pgd_iters = args.iters
 
                 ori = image1.data
