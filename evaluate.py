@@ -99,7 +99,7 @@ def fgsm_attack(image, epsilon, data_grad):
     return perturbed_image
 
 
-@torch.no_grad()
+#@torch.no_grad()
 def validate_sintel(model, iters=32, train=True):
     """ Peform validation using the Sintel (train) split """
     model.eval()
