@@ -177,8 +177,10 @@ def validate_kitti(model, iters=24):
         torch.set_grad_enabled(True) 
     val_dataset = datasets.KITTI(split='training')
 
+
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
+        print(args.attack_type)
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
