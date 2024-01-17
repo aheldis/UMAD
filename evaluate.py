@@ -180,7 +180,6 @@ def validate_kitti(model, iters=24):
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        print(args.attack_type)
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
@@ -216,9 +215,8 @@ def validate_kitti(model, iters=24):
                     image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
                 if args.attack_type == 'PGD':
                     offset = torch.sum((image1.data - ori), 1) / 3
-                    print(offset.shape)
-                    break
-                    image1.data = ori + torch.clamp(image1.data - ori, -args.epsilon, args.epsilon)
+                    offset = offset.unsqueeze(1).repeat(1, 3, 1, 1)
+                    image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
