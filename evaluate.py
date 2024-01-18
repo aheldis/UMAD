@@ -214,7 +214,8 @@ def validate_kitti(model, iters=24):
                 else:
                     image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
                 if args.attack_type == 'PGD':
-                    offset = torch.sum((image1.data - ori), 1) / 3
+                    offset = image1.data - ori
+                    offset = torch.sum((offset), 1) / torch.norm(offset) * torch.norm(torch.sum((offset), 1))
                     offset = offset.unsqueeze(1).repeat(1, 3, 1, 1)
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
