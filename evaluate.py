@@ -219,7 +219,7 @@ def validate_kitti(model, iters=24):
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
-            viz(args, image1, flow_pr, "flow")
+            viz(args, image1.detach().numpy(), flow_pr.detach().numpy(), "flow")
 
         break
         # end attack
