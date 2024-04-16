@@ -28,8 +28,9 @@ class_boundary = list(np.arange(0, 16, 2))
 # class_boundary = list(np.arange(0, 400, 400//10))
 class_boundary.append(400)
 
-def viz(args, img, flo, name):
-    img = img[0].permute(1,2,0).cpu().numpy()
+def viz(args, img1, img2, flo, name):
+    img = img1[0].permute(1,2,0).cpu().numpy()
+    img2 = img2[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
     # map flow to rgb image
@@ -60,11 +61,13 @@ def viz(args, img, flo, name):
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_gray = ImageOps.grayscale(flox_rgb)    
+    flox_rgb.save(args.output_path + '/' + name)
 
+    flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/' + 'img1.png')
+    flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/' + 'img2.png')
 
-    flox_rgb.save(args.output_path + '/rgb/' + name)
-    flox_gray.save(args.output_path + '/gray/' + name)
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
