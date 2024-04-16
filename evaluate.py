@@ -262,7 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
     parser.add_argument('--output_path', help="output viz")
-    parser.add_argument('--name', help="output viz", default="flow")
+    parser.add_argument('--name', help="output viz", default="flow.png")
 
     args = parser.parse_args()
 
