@@ -31,6 +31,7 @@ class_boundary.append(400)
 def viz(args, img1, img2, diff, flo, name):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
+    diff = diff[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
     # map flow to rgb image
