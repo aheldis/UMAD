@@ -221,7 +221,7 @@ def validate_kitti(model, iters=24):
               
             viz(args, image1.cpu().detach(), flow_pr.cpu().detach(), args.name)
 
-        break
+        
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
@@ -235,6 +235,7 @@ def validate_kitti(model, iters=24):
         out = ((epe > 3.0) & ((epe/mag) > 0.05)).float()
         epe_list.append(epe[val].mean().item())
         out_list.append(out[val].cpu().numpy())
+        break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
