@@ -193,7 +193,7 @@ def validate_kitti(model, iters=24):
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
-        ori = image1.data
+        ori = image1.data.clone().detach()
         if args.attack_type != 'None':
             if args.attack_type == 'FGSM':
                 epsilon = args.epsilon
@@ -202,7 +202,6 @@ def validate_kitti(model, iters=24):
                 epsilon = 2.5 * args.epsilon / args.iters
                 pgd_iters = args.iters
         
-            ori = image1.data
             for iter in range(pgd_iters):
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
@@ -258,7 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
     parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50)
-    parser.add_argument('--epsilon', help='epsilon?', type=int, default=10)
+    parser.add_argument('--epsilon', help='epsilon?', type=int, default=10.0)
     parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)    
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
