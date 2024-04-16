@@ -69,7 +69,7 @@ def viz(args, img1, img2, diff, flo, name):
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/' + 'img2.png')
     flox_rgb = Image.fromarray(diff.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + 'diff' + name)
+    flox_rgb.save(args.output_path + '/' + 'diff-' + name)
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)

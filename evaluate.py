@@ -193,6 +193,7 @@ def validate_kitti(model, iters=24):
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
+        ori = image1.data
         if args.attack_type != 'None':
             if args.attack_type == 'FGSM':
                 epsilon = args.epsilon
