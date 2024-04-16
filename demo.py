@@ -28,7 +28,7 @@ class_boundary = list(np.arange(0, 16, 2))
 # class_boundary = list(np.arange(0, 400, 400//10))
 class_boundary.append(400)
 
-def viz(args, img1, img2, flo, name):
+def viz(args, img1, img2, diff, flo, name):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
@@ -67,7 +67,8 @@ def viz(args, img1, img2, flo, name):
     flox_rgb.save(args.output_path + '/' + 'img1.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/' + 'img2.png')
-
+    flox_rgb = Image.fromarray(diff.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/' + 'diff' + name)
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
