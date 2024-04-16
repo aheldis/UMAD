@@ -220,6 +220,8 @@ def validate_kitti(model, iters=24):
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
               viz(args, image1, flow_pr, "flow")
+
+        break
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
