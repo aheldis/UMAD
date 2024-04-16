@@ -219,7 +219,7 @@ def validate_kitti(model, iters=24):
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
-            viz(args, image1.detach().numpy(), flow_pr.detach().numpy(), "flow")
+            viz(args, image1.cpu().detach().numpy(), flow_pr.cpu().detach().numpy(), args.name)
 
         break
         # end attack
@@ -262,6 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
     parser.add_argument('--output_path', help="output viz")
+    parser.add_argument('--name', help="output viz", default="flow")
 
     args = parser.parse_args()
 
