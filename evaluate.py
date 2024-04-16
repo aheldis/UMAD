@@ -16,6 +16,7 @@ from utils import frame_utils
 
 from raft import RAFT
 from utils.utils import InputPadder, forward_interpolate
+from demo import *
 
 
 @torch.no_grad()
@@ -217,6 +218,8 @@ def validate_kitti(model, iters=24):
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+              
+              viz(args, image1, flow_pr, "flow")
         # end attack
         flow = padder.unpad(flow_pr[0]).cpu()
 
@@ -256,6 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
+    parser.add_argument('--output_path', help="output viz")
 
     args = parser.parse_args()
 
