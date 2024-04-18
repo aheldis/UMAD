@@ -62,7 +62,7 @@ def viz(args, img1, img2, diff, flo, name):
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + name)
+    flox_rgb.save(args.output_path + '/difference-in-flow-' + name)
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/' + 'img1.png')
