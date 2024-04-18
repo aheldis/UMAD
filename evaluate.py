@@ -193,7 +193,7 @@ def validate_kitti(model, iters=24):
 
         flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
         # start attack
-        saved_flow = flow_pr.data.clone.detach()
+        saved_flow = flow_pr.data.clone().detach()
         ori = image1.data.clone().detach()
         if args.attack_type != 'None':
             if args.attack_type == 'FGSM':
@@ -220,7 +220,7 @@ def validate_kitti(model, iters=24):
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
-        viz(args, ori.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), (flow_pr - saved_flow).cpu().detach(), args.name)
+        viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), (flow_pr - saved_flow).cpu().detach(), args.name)
 
         
         # end attack
