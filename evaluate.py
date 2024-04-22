@@ -200,7 +200,7 @@ def validate_kitti(model, iters=24):
                 epsilon = args.epsilon
                 shape = image1.shape
                 delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
-                image1.data = ori + delta
+                image1.data = ori + torch.from_numpy(delta)
                 image1.data = torch.clamp(image1.data, 0, 255)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
                 pgd_iters = 0
