@@ -196,7 +196,15 @@ def validate_kitti(model, iters=24):
         saved_flow = flow_pr.data.clone().detach()
         ori = image1.data.clone().detach()
         if args.attack_type != 'None':
-            if args.attack_type == 'FGSM':
+            if args.attack_type == "RAND":
+                epsilon = args.epsilon
+                shape = image1.shape
+                delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
+                image1.data = ori + delta
+                image1.data = torch.clamp(image1.data, 0, 255)
+                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+                pgd_iters = 0
+            elif args.attack_type == 'FGSM':
                 epsilon = args.epsilon
                 pgd_iters = 1
             else:
@@ -220,7 +228,7 @@ def validate_kitti(model, iters=24):
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
-        viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), (flow_pr - saved_flow).cpu().detach(), args.name)
+        # viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), (flow_pr - saved_flow).cpu().detach(), args.name)
 
         
         # end attack
@@ -236,7 +244,7 @@ def validate_kitti(model, iters=24):
         out = ((epe > 3.0) & ((epe/mag) > 0.05)).float()
         epe_list.append(epe[val].mean().item())
         out_list.append(out[val].cpu().numpy())
-        break
+        # break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
