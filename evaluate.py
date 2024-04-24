@@ -228,7 +228,7 @@ def validate_kitti(model, iters=24):
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
               
-        viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), flow_pr.cpu().detach(), args.name)
+        # viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), flow_pr.cpu().detach(), args.name)
 
         
         # end attack
@@ -244,7 +244,7 @@ def validate_kitti(model, iters=24):
         out = ((epe > 3.0) & ((epe/mag) > 0.05)).float()
         epe_list.append(epe[val].mean().item())
         out_list.append(out[val].cpu().numpy())
-        break
+        # break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
