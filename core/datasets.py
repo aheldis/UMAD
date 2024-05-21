@@ -31,6 +31,28 @@ class FlowDataset(data.Dataset):
         self.image_list = []
         self.extra_info = []
 
+        self.front_list = []
+        self.front_left_list = []
+        self.back_left_list= []
+        self.back_list = []
+        self.back_right_list = []
+        self.front_right_list = []
+
+    def select_partition(self, partition):
+        if partition == 'front':
+            self.image_list = self.front_list
+        elif partition == 'front_left':
+            self.image_list = self.front_left_list
+        elif partition == 'back_left':
+            self.image_list = self.back_left_list
+        elif partition == 'back':
+            self.image_list = self.back_list
+        elif partition == 'back_right':
+            self.image_list = self.back_right_list
+        elif partition == 'front_right':
+            self.image_list = self.front_right_list
+
+
     def __getitem__(self, index):
 
         if self.is_test:
@@ -52,15 +74,18 @@ class FlowDataset(data.Dataset):
 
         index = index % len(self.image_list)
         valid = None
-        if self.sparse:
+
+        flow = None
+        if len(self.flow_list) != 0 and self.sparse:
             flow, valid = frame_utils.readFlowKITTI(self.flow_list[index])
-        else:
+        elif len(self.flow_list) != 0:
             flow = frame_utils.read_gen(self.flow_list[index])
 
         img1 = frame_utils.read_gen(self.image_list[index][0])
         img2 = frame_utils.read_gen(self.image_list[index][1])
 
-        flow = np.array(flow).astype(np.float32)
+        if flow is not None:
+            flow = np.array(flow).astype(np.float32)
         img1 = np.array(img1).astype(np.uint8)
         img2 = np.array(img2).astype(np.uint8)
 
@@ -80,12 +105,15 @@ class FlowDataset(data.Dataset):
 
         img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
         img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
-        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+        if len(self.flow_list) != 0:
+            flow = torch.from_numpy(flow).permute(2, 0, 1).float()
 
         if valid is not None:
             valid = torch.from_numpy(valid)
-        else:
+        elif flow is not None:
             valid = (flow[0].abs() < 1000) & (flow[1].abs() < 1000)
+        else:
+            return img1, img2
 
         return img1, img2, flow, valid.float()
 
@@ -198,6 +226,33 @@ class HD1K(FlowDataset):
                 self.image_list += [ [images[i], images[i+1]] ]
 
             seq_ix += 1
+
+
+class nuScenes(FlowDataset):
+    def __init__(self, aug_params=None, partition='front', root='../nuscenes/samples'):
+        super(nuScenes, self).__init__(aug_params, sparse=False)
+
+        front = sorted(glob(os.path.join(root, 'CAM_FRONT/*.jpg')))
+        front_left = sorted(glob(os.path.join(root, 'CAM_FRONT_LEFT/*.jpg')))
+        back_left = sorted(glob(os.path.join(root, 'CAM_BACK_LEFT/*.jpg')))
+        back = sorted(glob(os.path.join(root, 'CAM_BACK/*.jpg')))
+        back_right = sorted(glob(os.path.join(root, 'CAM_BACK_RIGHT/*.jpg')))
+        front_right = sorted(glob(os.path.join(root, 'CAM_FRONT_RIGHT/*.jpg')))
+        self.is_test = True
+
+        print(len(front), len(front_left), len(front_right), len(back), len(back_left), len(back_right))
+
+        for i in range(len(front) - 1):
+            frame_id = front[i].split('/')[-1]
+            self.extra_info += [[frame_id]]
+            self.front_list += [[front[i], front[i + 1]]]
+            self.front_left_list += [[front_left[i], front_left[i + 1]]]
+            self.back_left_list += [[back_left[i], back_left[i + 1]]]
+            self.back_list += [[back[i], back[i + 1]]]
+            self.back_right_list += [[back_right[i], back_right[i + 1]]]
+            self.front_right_list += [[front_right[i], front_right[i + 1]]]
+
+        self.select_partition(partition)
 
 
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):

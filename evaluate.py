@@ -18,6 +18,8 @@ from raft import RAFT
 from utils.utils import InputPadder, forward_interpolate
 from demo import *
 
+from utils import flow_viz
+
 
 @torch.no_grad()
 def create_sintel_submission(model, iters=32, warm_start=False, output_path='sintel_submission'):
@@ -70,6 +72,33 @@ def create_kitti_submission(model, iters=24, output_path='kitti_submission'):
 
         output_filename = os.path.join(output_path, frame_id)
         frame_utils.writeFlowKITTI(output_filename, flow)
+
+
+@torch.no_grad()
+def create_nuscenes_submission(model, iters=24, partition='front', output_path='nuscenes_submission'):
+    """ Create submission for the Sintel leaderboard """
+    model.eval()
+    test_dataset = datasets.nuScenes(aug_params=None, partition=partition)
+    output_path = os.path.join(output_path, partition)
+
+    print(output_path)
+
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    for test_id in range(len(test_dataset)):
+        image1, image2, (frame_id, ) = test_dataset[test_id]
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1[None].cuda(), image2[None].cuda())
+
+        _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow = padder.unpad(flow_pr[0]).permute(1, 2, 0).cpu().numpy()
+        # flo = flow_viz.flow_to_image(flow)
+        # flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
+        # flox_rgb.save(output_path + '/' + frame_id)
+        output_filename = os.path.join(output_path, frame_id)
+        frame_utils.writeFlow(output_filename, flow)
+        # saved = frame_utils.readFlow(output_filename)
 
 
 @torch.no_grad()
@@ -273,6 +302,8 @@ if __name__ == '__main__':
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
     parser.add_argument('--output_path', help="output viz")
     parser.add_argument('--name', help="output viz", default="flow.png")
+    parser.add_argument('--partition', type=str, default="front")
+
 
     args = parser.parse_args()
 
@@ -299,5 +330,8 @@ if __name__ == '__main__':
 
         elif args.dataset == 'kitti':
             validate_kitti(model.module)
+
+        elif args.dataset == "nuscenes":
+            create_nuscenes_submission(model.module, partition=args.partition)
 
 
