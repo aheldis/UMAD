@@ -31,27 +31,6 @@ class FlowDataset(data.Dataset):
         self.image_list = []
         self.extra_info = []
 
-        self.front_list = []
-        self.front_left_list = []
-        self.back_left_list= []
-        self.back_list = []
-        self.back_right_list = []
-        self.front_right_list = []
-
-    def select_partition(self, partition):
-        if partition == 'front':
-            self.image_list = self.front_list
-        elif partition == 'front_left':
-            self.image_list = self.front_left_list
-        elif partition == 'back_left':
-            self.image_list = self.back_left_list
-        elif partition == 'back':
-            self.image_list = self.back_list
-        elif partition == 'back_right':
-            self.image_list = self.back_right_list
-        elif partition == 'front_right':
-            self.image_list = self.front_right_list
-
 
     def __getitem__(self, index):
 
@@ -243,16 +222,27 @@ class nuScenes(FlowDataset):
         print(len(front), len(front_left), len(front_right), len(back), len(back_left), len(back_right))
 
         for i in range(len(front) - 1):
-            frame_id = front[i].split('/')[-1]
-            self.extra_info += [[frame_id]]
-            self.front_list += [[front[i], front[i + 1]]]
-            self.front_left_list += [[front_left[i], front_left[i + 1]]]
-            self.back_left_list += [[back_left[i], back_left[i + 1]]]
-            self.back_list += [[back[i], back[i + 1]]]
-            self.back_right_list += [[back_right[i], back_right[i + 1]]]
-            self.front_right_list += [[front_right[i], front_right[i + 1]]]
 
-        self.select_partition(partition)
+            if partition == 'front':
+                frame_id = front[i].split('/')[-1]
+                self.image_list += [[front[i], front[i + 1]]]
+            elif partition == 'front_left':
+                frame_id = front_left[i].split('/')[-1]
+                self.image_list += [[front_left[i], front_left[i + 1]]]
+            elif partition == 'back_left':
+                frame_id = back_left[i].split('/')[-1]
+                self.image_list += [[back_left[i], back_left[i + 1]]]
+            elif partition == 'back':
+                frame_id = back[i].split('/')[-1]
+                self.image_list += [[back[i], back[i + 1]]]
+            elif partition == 'back_right':
+                frame_id = back_right[i].split('/')[-1]
+                self.image_list += [[back_right[i], back_right[i + 1]]]
+            elif partition == 'front_right':
+                frame_id = front_right[i].split('/')[-1]
+                self.image_list += [[front_right[i], front_right[i + 1]]]
+            self.extra_info += [[frame_id]]
+
 
 
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
