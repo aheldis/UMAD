@@ -28,16 +28,15 @@ class_boundary = list(np.arange(0, 16, 2))
 # class_boundary = list(np.arange(0, 400, 400//10))
 class_boundary.append(400)
 
-def viz(args, img1, img2, diff, flo, name):
+def viz(args, img1, img2, gt_flo, flo):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
-    diff = diff[0].permute(1,2,0).cpu().numpy()
+    gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
     # map flow to rgb image
+    gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
-    img_flo = np.concatenate([img, flo], axis=0)
-
     try:
         os.mkdir(args.output_path + '/gray')
     except:
@@ -46,9 +45,6 @@ def viz(args, img1, img2, diff, flo, name):
         os.mkdir(args.output_path + '/rgb')
     except:
         pass
-
-    name = name.split('/')
-    name = name[-1]
     
     # mag = np.sqrt(np.sum(flo**2, axis=2)) 
     # _class = np.zeros(mag.shape)
@@ -61,15 +57,15 @@ def viz(args, img1, img2, diff, flo, name):
     # flox_gray = ImageOps.grayscale(flox_rgb)    
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
+    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/ground_truth_flow.png')
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/difference-in-flow-' + name)
+    flox_rgb.save(args.output_path + '/predicted_flow.png')
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + 'attacked-img-' + name)
+    flox_rgb.save(args.output_path + '/' + 'img1.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/' + 'img2.png')
-    flox_rgb = Image.fromarray(diff.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + 'diff-' + name)
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
