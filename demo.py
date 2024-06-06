@@ -38,11 +38,7 @@ def viz(args, img1, img2, gt_flo, flo):
     gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
     try:
-        os.mkdir(args.output_path + '/gray')
-    except:
-        pass
-    try:
-        os.mkdir(args.output_path + '/rgb')
+        os.mkdir(args.output_path)
     except:
         pass
     
