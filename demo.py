@@ -28,14 +28,14 @@ def load_image(imfile):
 # class_boundary = list(np.arange(0, 400, 400//10))
 # class_boundary.append(400)
 
-def viz(args, img1, img2, flo):
+def viz(args, img1, img2, flo, gt_flo, _id):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
-    # gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
+    gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
     # map flow to rgb image
-    # gt_flo = flow_viz.flow_to_image(gt_flo)
+    gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
     try:
         os.mkdir(args.output_path)
@@ -53,15 +53,15 @@ def viz(args, img1, img2, flo):
     # flox_gray = ImageOps.grayscale(flox_rgb)    
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
-    # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    # flox_rgb.save(args.output_path + '/ground_truth_flow.png')
+    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/attacked_flow_' + _id + '.png')
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/predicted_flow.png')
+    flox_rgb.save(args.output_path + '/predicted_flow_' + _id + '.png')
 
-    flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + 'img1.png')
-    flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/' + 'img2.png')
+    # flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
+    # flox_rgb.save(args.output_path + '/' + 'img1.png')
+    # flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
+    # flox_rgb.save(args.output_path + '/' + 'img2.png')
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
@@ -70,6 +70,11 @@ def viz(args, img1, img2, flo):
     # cv2.imshow('image', img_flo[:, :, [2,1,0]]/255.0)
     # cv2.waitKey()
 
+def fgsm_attack(image, epsilon, data_grad):
+    sign_data_grad = data_grad.sign()
+    perturbed_image = image + epsilon*sign_data_grad
+    perturbed_image = torch.clamp(perturbed_image, 0, 255)
+    return perturbed_image
 
 def demo(args):
     model = torch.nn.DataParallel(RAFT(args))
@@ -83,22 +88,61 @@ def demo(args):
     model.to(DEVICE)
     model.eval()
 
-    with torch.no_grad():
-        images = glob.glob(os.path.join(args.path, '*.png')) + \
-                 glob.glob(os.path.join(args.path, '*.jpg'))
+    # with torch.no_grad():
+    _id = 0
+    images = glob.glob(os.path.join(args.path, '*.png')) + \
+                glob.glob(os.path.join(args.path, '*.jpg'))
+    
+    images = sorted(images)
+    for imfile1, imfile2 in zip(images[:-1], images[1:]):
+        image1 = load_image(imfile1)
+        image2 = load_image(imfile2)
+        print(torch.max(image1), torch.min(image1))
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
         
-        images = sorted(images)
-        for imfile1, imfile2 in zip(images[:-1], images[1:]):
-            image1 = load_image(imfile1)
-            image2 = load_image(imfile2)
-            print(torch.max(image1), torch.min(image1))
+        # start attack
+        if args.attack_type != 'None':
+            image1.requires_grad = True # for attack
 
-            padder = InputPadder(image1.shape)
-            image1, image2 = padder.pad(image1, image2)
-
-            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
-            print(image1)
-            viz(args, image1, image2, flow_up)
+        ori = image1.data.clone().detach()
+        if args.attack_type != 'None':
+            if args.attack_type == "RAND":
+                epsilon = args.epsilon
+                shape = image1.shape
+                delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
+                image1.data = ori + torch.from_numpy(delta).type(torch.float).cuda()
+                image1.data = torch.clamp(image1.data, 0.0, 255.0)
+                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+                pgd_iters = 0
+            elif args.attack_type == 'FGSM':
+                epsilon = args.epsilon
+                pgd_iters = 1
+            else:
+                epsilon = 2.5 * args.epsilon / args.iters
+                pgd_iters = args.iters
+        
+            for iter in range(pgd_iters):
+                flow = padder.unpad(flow_pr[0])
+                epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
+                model.zero_grad()
+                image1.requires_grad = True
+                epe.mean().backward()
+                data_grad = image1.grad.data
+                args.channel = int(args.channel)
+                if args.channel == -1:
+                    image1.data = fgsm_attack(image1, epsilon, data_grad)
+                else:
+                    image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
+                if args.attack_type == 'PGD':
+                    offset = image1.data - ori
+                    image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
+            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        viz(args, image1, image2, flow_up, flow_pr, str(_id))
+        _id += 1
 
 
 if __name__ == '__main__':
