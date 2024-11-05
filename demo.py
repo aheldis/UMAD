@@ -19,7 +19,7 @@ import torchvision.transforms as T
 
 DEVICE = 'cuda'
 
-def load_image(imfile, T):
+def load_image(imfile, transform):
     image = Image.open(imfile)
     image = transform(image)
     img = np.array(image).astype(np.uint8)
