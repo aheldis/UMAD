@@ -29,8 +29,8 @@ def load_image(imfile):
 # class_boundary.append(400)
 
 def viz(args, img1, img2, flo, gt_flo, _id):
-    img = img1[0].permute(1,2,0).cpu().numpy()
-    img2 = img2[0].permute(1,2,0).cpu().numpy()
+    # img = img1[0].permute(1,2,0).cpu().numpy()
+    # img2 = img2[0].permute(1,2,0).cpu().numpy()
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
@@ -109,28 +109,28 @@ def demo(args):
             image1.requires_grad = True # for attack
 
         ori = image1.data.clone().detach()
+        flow_gt = padder.unpad(flow_up[0]).clone().detach()
+
         if args.attack_type != 'None':
-            if args.attack_type == "RAND":
-                epsilon = args.epsilon
-                shape = image1.shape
-                delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
-                image1.data = ori + torch.from_numpy(delta).type(torch.float).cuda()
-                image1.data = torch.clamp(image1.data, 0.0, 255.0)
-                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-                pgd_iters = 0
-            elif args.attack_type == 'FGSM':
+            if args.attack_type == 'FGSM':
                 epsilon = args.epsilon
                 pgd_iters = 1
             else:
                 epsilon = 2.5 * args.epsilon / args.iters
                 pgd_iters = args.iters
+            
+            shape = image1.shape
+            delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 
+            image1.data = ori + torch.from_numpy(delta).type(torch.float).cuda()
+            image1.data = torch.clamp(image1.data, 0.0, 255.0)
+            flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
         
             for iter in range(pgd_iters):
                 flow = padder.unpad(flow_pr[0])
                 epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
                 model.zero_grad()
                 image1.requires_grad = True
-                epe.mean().backward()
+                epe.mean().backward(retain_graph=True)
                 data_grad = image1.grad.data
                 args.channel = int(args.channel)
                 if args.channel == -1:
@@ -140,7 +140,7 @@ def demo(args):
                 if args.attack_type == 'PGD':
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
-            flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
         viz(args, image1, image2, flow_up, flow_pr, str(_id))
         _id += 1
 
@@ -157,6 +157,10 @@ if __name__ == '__main__':
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
+    parser.add_argument('--epsilon', help='epsilon?', type=int, default=10.0)
+    parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)  
+    parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50) 
     args = parser.parse_args()
 
     demo(args)
