@@ -141,7 +141,7 @@ def demo(args):
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
             flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-        viz(args, image1, image2, flow_up.detach().numpy(), flow_pr.detach().numpy(), str(_id))
+        viz(args, image1, image2, flow_up.detach().cpu().numpy(), flow_pr.detach().cpu().numpy(), str(_id))
         _id += 1
 
 
