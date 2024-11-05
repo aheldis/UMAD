@@ -77,6 +77,9 @@ def fgsm_attack(image, epsilon, data_grad):
     return perturbed_image
 
 def demo(args):
+
+    torch.cuda.empty_cache()
+
     model = torch.nn.DataParallel(RAFT(args))
     if not args.raft:
         checkpoint = torch.load(args.model)
@@ -107,6 +110,8 @@ def demo(args):
         # start attack
         if args.attack_type != 'None':
             image1.requires_grad = True # for attack
+        
+        torch.cuda.empty_cache()
 
         ori = image1.data.clone().detach()
         flow_gt = padder.unpad(flow_up[0]).clone().detach()
@@ -141,7 +146,7 @@ def demo(args):
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
             flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-        viz(args, image1, image2, flow_up.detach().cpu().numpy(), flow_pr.detach().cpu().numpy(), str(_id))
+        viz(args, image1, image2, flow_up.detach(), flow_pr.detach(), str(_id))
         _id += 1
 
 
@@ -157,7 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
-    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='FGSM')
     parser.add_argument('--epsilon', help='epsilon?', type=int, default=10.0)
     parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)  
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50) 
