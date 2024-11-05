@@ -101,6 +101,7 @@ def demo(args):
         image1 = load_image(imfile1)
         image2 = load_image(imfile2)
         print(torch.max(image1), torch.min(image1))
+        print(image1.shape)
 
         padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
