@@ -12,13 +12,17 @@ from PIL import Image, ImageOps
 from raft import RAFT
 from utils import flow_viz
 from utils.utils import InputPadder
+import torchvision.transforms as T
+
 
 
 
 DEVICE = 'cuda'
 
-def load_image(imfile):
-    img = np.array(Image.open(imfile)).astype(np.uint8)
+def load_image(imfile, T):
+    image = Image.open(imfile)
+    image = transform(image)
+    img = np.array(image).astype(np.uint8)
     img = torch.from_numpy(img).permute(2, 0, 1).float()
     return img[None].to(DEVICE)
 
@@ -77,6 +81,7 @@ def fgsm_attack(image, epsilon, data_grad):
     return perturbed_image
 
 def demo(args):
+    transform = T.Resize((240, 427))
 
     torch.cuda.empty_cache()
 
@@ -98,8 +103,8 @@ def demo(args):
     
     images = sorted(images)
     for imfile1, imfile2 in zip(images[:-1], images[1:]):
-        image1 = load_image(imfile1)
-        image2 = load_image(imfile2)
+        image1 = load_image(imfile1, transform)
+        image2 = load_image(imfile2, transform)
         print(torch.max(image1), torch.min(image1))
         print(image1.shape)
 
