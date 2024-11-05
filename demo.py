@@ -23,19 +23,19 @@ def load_image(imfile):
     return img[None].to(DEVICE)
 
 
-class_boundary = list(np.arange(0, 16, 2))
+# class_boundary = list(np.arange(0, 16, 2))
 # class_boundary.append(400)
 # class_boundary = list(np.arange(0, 400, 400//10))
-class_boundary.append(400)
+# class_boundary.append(400)
 
-def viz(args, img1, img2, gt_flo, flo):
+def viz(args, img1, img2, flo):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
-    gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
+    # gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
     # map flow to rgb image
-    gt_flo = flow_viz.flow_to_image(gt_flo)
+    # gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
     try:
         os.mkdir(args.output_path)
@@ -53,8 +53,8 @@ def viz(args, img1, img2, gt_flo, flo):
     # flox_gray = ImageOps.grayscale(flox_rgb)    
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
-    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/ground_truth_flow.png')
+    # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    # flox_rgb.save(args.output_path + '/ground_truth_flow.png')
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/predicted_flow.png')
 
@@ -97,7 +97,8 @@ def demo(args):
             image1, image2 = padder.pad(image1, image2)
 
             flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
-            viz(args, image1, flow_up, imfile1)
+            print(image1)
+            viz(args, image1, image2, flow_up)
 
 
 if __name__ == '__main__':
@@ -109,6 +110,9 @@ if __name__ == '__main__':
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
     parser.add_argument('--raft', help="checkpoint from the RAFT paper?", type=bool, default=True)
+    parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
+    parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
+    parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
     args = parser.parse_args()
 
     demo(args)
