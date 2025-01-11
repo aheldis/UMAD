@@ -58,7 +58,7 @@ def viz(args, img1, img2, flo, gt_flo, _id):
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
 
     flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    flox_rgb.save(args.output_path + '/attacked_flow_' + _id + '.png')
+    flox_rgb.save(args.output_path + '/diff_flow_' + _id + '.png')
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/predicted_flow_' + _id + '.png')
 
@@ -152,7 +152,7 @@ def demo(args):
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
             flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-        viz(args, image1, image1.data - ori, flow_up.detach(), flow_pr.detach(), str(_id))
+        viz(args, image1, image1.data - ori, (flow_pr - flow_up).detach(), flow_pr.detach(), str(_id))
         _id += 1
 
 
