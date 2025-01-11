@@ -33,8 +33,8 @@ def load_image(imfile, transform):
 # class_boundary.append(400)
 
 def viz(args, img1, img2, flo, gt_flo, _id):
-    # img = img1[0].permute(1,2,0).cpu().numpy()
-    # img2 = img2[0].permute(1,2,0).cpu().numpy()
+    img = img1[0].permute(1,2,0).cpu().numpy()
+    img2 = img2[0].permute(1,2,0).cpu().numpy()
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
     
@@ -62,10 +62,10 @@ def viz(args, img1, img2, flo, gt_flo, _id):
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
     flox_rgb.save(args.output_path + '/predicted_flow_' + _id + '.png')
 
-    # flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    # flox_rgb.save(args.output_path + '/' + 'img1.png')
-    # flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
-    # flox_rgb.save(args.output_path + '/' + 'img2.png')
+    flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/' + 'attacked_img' + _id + '.png')
+    flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
+    flox_rgb.save(args.output_path + '/' + 'noise' + _id + '.png')
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
@@ -152,7 +152,7 @@ def demo(args):
                     offset = image1.data - ori
                     image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
             flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-        viz(args, image1, image2, flow_up.detach(), flow_pr.detach(), str(_id))
+        viz(args, image1, image1.data - ori, flow_up.detach(), flow_pr.detach(), str(_id))
         _id += 1
 
 
