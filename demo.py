@@ -44,12 +44,14 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     try:
         os.mkdir(args.output_path)
     except:
+        print("couldn't: ", args.output_path)
         pass
     
     if len(path):
         try:
             os.mkdir(os.path.join(args.output_path, path))
         except:
+            print("couldn't: ", os.path.join(args.output_path, path))
             pass
     
     # mag = np.sqrt(np.sum(flo**2, axis=2)) 
