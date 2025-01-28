@@ -42,8 +42,6 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
 
-    cwd = os.getcwd()
-    args.output_path = os.path.join(cwd, args.output_path)
     try:
         os.mkdir(args.output_path)
     except:
@@ -116,6 +114,9 @@ def demo(args):
             paths.append(new_path)
     if len(paths) == 0:
         paths.append(path)
+
+    cwd = os.getcwd()
+    args.output_path = os.path.join(cwd, args.output_path)
 
 
     for path in paths:
