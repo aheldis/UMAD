@@ -43,14 +43,14 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     flo = flow_viz.flow_to_image(flo)
 
     try:
-        os.mkdir(args.output_path)
+        os.mkdir(args.output_path, exist_ok=True)
     except:
         print("couldn't: ", args.output_path)
         pass
     
     if len(path):
         try:
-            os.mkdir(os.path.join(args.output_path, path))
+            os.mkdir(os.path.join(args.output_path, path), exist_ok=True)
         except:
             print("couldn't: ", args.output_path)
             pass
@@ -115,8 +115,8 @@ def demo(args):
     if len(paths) == 0:
         paths.append(path)
 
-    cwd = os.getcwd()
-    args.output_path = os.path.join(cwd, args.output_path)
+    # cwd = os.getcwd()
+    # args.output_path = os.path.join(cwd, args.output_path)
 
 
     for path in paths:
