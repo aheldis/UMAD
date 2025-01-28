@@ -117,7 +117,7 @@ def demo(args):
             new_path = args.path + '/' + entry.name
             paths.append(new_path)
     if len(paths) == 0:
-        paths.append(path)
+        paths.append(args.path)
 
     # cwd = os.getcwd()
     # args.output_path = os.path.join(cwd, args.output_path)
