@@ -43,8 +43,8 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
 
     
     # map flow to rgb image
-    gt_flo = flow_viz.flow_to_image(gt_flo)
-    flo = flow_viz.flow_to_image(flo)
+    # gt_flo = flow_viz.flow_to_image(gt_flo)
+    # flo = flow_viz.flow_to_image(flo)
 
     try:
         os.mkdir(args.output_path)
