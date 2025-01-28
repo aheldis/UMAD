@@ -71,10 +71,10 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
     output_path = os.path.join(args.output_path, path)
 
-    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
-    flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/predicted_flow_' + _id + '.png')
+    # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    # flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
+    # flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
+    # flox_rgb.save(output_path + '/predicted_flow_' + _id + '.png')
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
     flox_rgb.save(output_path + '/' + 'attacked_img' + _id + '.png')
