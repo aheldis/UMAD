@@ -56,7 +56,7 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
         try:
             os.mkdir(os.path.join(args.output_path, path))
         except Exception as e:
-            print(f"Couldn't create directory {args.output_path}: {e}")
+            print(f"Couldn't create directory {os.path.join(args.output_path, path)}: {e}")
             return 
     
     # mag = np.sqrt(np.sum(flo**2, axis=2)) 
@@ -68,8 +68,9 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
 
     # flox_rgb = Image.fromarray(_class.astype('uint8'), 'RGB')
     # flox_gray = ImageOps.grayscale(flox_rgb)    
-    # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')    
-    output_path = os.path.join(args.output_path, path)
+    # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')   
+    if len(path): 
+        output_path = os.path.join(args.output_path, path)
 
     # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
     # flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
