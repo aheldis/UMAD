@@ -69,6 +69,7 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     # flox_rgb = Image.fromarray(_class.astype('uint8'), 'RGB')
     # flox_gray = ImageOps.grayscale(flox_rgb)    
     # flox_gray = Image.fromarray(_class.astype('uint8'), 'L')   
+    output_path = args.output_path
     if len(path): 
         output_path = os.path.join(args.output_path, path)
 
