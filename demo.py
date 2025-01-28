@@ -35,7 +35,7 @@ def load_image(imfile, transform):
 def viz(args, img1, img2, flo, gt_flo, path, _id):
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
-    boundary = np.max(img.shape[0], img.shape[1])
+    boundary = max(img.shape[0], img.shape[1])
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     gt_flo = np.where(gt_flo > boundary, boundary, gt_flo)
     flo = flo[0].permute(1,2,0).cpu().numpy()
