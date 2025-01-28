@@ -171,7 +171,7 @@ def demo(args):
                         offset = image1.data - ori
                         image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-            folder_name = path[len(args.path):]
+            folder_name = os.path.join(args.output_path, path[len(args.path):])
             viz(args, image1.detach(), (image1.data - ori).detach(), (flow_pr - flow_up).detach(), flow_pr.detach(), folder_name, str(_id))
             _id += 1
 
