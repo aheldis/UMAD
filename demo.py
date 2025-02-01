@@ -37,14 +37,14 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     img2 = img2[0].permute(1,2,0).cpu().numpy()
     boundary = max(img.shape[0], img.shape[1])
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
-    gt_flo = np.where(gt_flo > boundary, boundary, gt_flo)
+    # gt_flo = np.where(gt_flo > boundary, boundary, gt_flo)
     flo = flo[0].permute(1,2,0).cpu().numpy()
-    flo = np.where(flo > boundary, boundary, flo)
+    # flo = np.where(flo > boundary, boundary, flo)
 
     
     # map flow to rgb image
-    gt_flo = flow_viz.flow_to_image(gt_flo)
-    flo = flow_viz.flow_to_image(flo)
+    # gt_flo = flow_viz.flow_to_image(gt_flo)
+    # flo = flow_viz.flow_to_image(flo)
 
     try:
         os.mkdir(args.output_path)
@@ -73,10 +73,10 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     if len(path): 
         output_path = os.path.join(args.output_path, path)
 
-    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
-    flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/predicted_flow_' + _id + '.png')
+    # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    # flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
+    # flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
+    # flox_rgb.save(output_path + '/predicted_flow_' + _id + '.png')
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
     flox_rgb.save(output_path + '/' + 'attacked_img' + _id + '.png')
@@ -120,6 +120,7 @@ def demo(args):
             paths.append(new_path)
     if len(paths) == 0:
         paths.append(args.path)
+    print(paths)
 
     # cwd = os.getcwd()
     # args.output_path = os.path.join(cwd, args.output_path)
@@ -181,7 +182,7 @@ def demo(args):
                         offset = image1.data - ori
                         image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
                 flow_low, flow_pr = model(image1, image2, iters=20, test_mode=True)
-            folder_name = path[len(args.path):]
+            folder_name = path[len(args.path) + 1:]
             viz(args, image1.detach(), (image1.data - ori).detach(), (flow_pr - flow_up).detach(), flow_pr.detach(), folder_name, str(_id))
             _id += 1
 
@@ -199,7 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
     parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='FGSM')
-    parser.add_argument('--epsilon', help='epsilon?', type=int, default=5)
+    parser.add_argument('--epsilon', help='epsilon?', type=int, default=10)
     parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)  
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50) 
     args = parser.parse_args()
