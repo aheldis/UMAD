@@ -50,14 +50,14 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
         os.mkdir(args.output_path)
     except Exception as e:
         print(f"Couldn't create directory {args.output_path}: {e}")
-        return 
+        # return 
     
     if len(path):
         try:
             os.mkdir(os.path.join(args.output_path, path))
         except Exception as e:
             print(f"Couldn't create directory {os.path.join(args.output_path, path)}: {e}")
-            return 
+            # return 
     
     # mag = np.sqrt(np.sum(flo**2, axis=2)) 
     # _class = np.zeros(mag.shape)
