@@ -199,7 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
-    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='FGSM')
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
     parser.add_argument('--epsilon', help='epsilon?', type=int, default=10)
     parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)  
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50) 
