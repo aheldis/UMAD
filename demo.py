@@ -187,7 +187,7 @@ def demo(args):
             folder_name = path[len(args.path) + 1:]
 
             flow_pred = padder.unpad(flow_pr[0])
-            epe = torch.sum((flow_pred - flow_gt.cuda())**2, dim=0).sqrt().view(-1).detach().numpy()
+            epe = torch.sum((flow_pred - flow_gt.cuda())**2, dim=0).sqrt().view(-1).detach().cpu().numpy()
             epes.append(epe)
 
             # viz(args, image1.detach(), (image1.data - ori).detach(), (flow_pr - flow_up).detach(), flow_pr.detach(), folder_name, str(_id))
