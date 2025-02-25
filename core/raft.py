@@ -4,11 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from update import BasicUpdateBlock, SmallUpdateBlock
-from extractor import BasicEncoder, SmallEncoder
+from extractor import SRBasicEncoder, SRSmallEncoder, BasicEncoder, SmallEncoder
 from corr import CorrBlock, AlternateCorrBlock
 from utils.utils import bilinear_sampler, coords_grid, upflow8
-from attention import CBAM
-import cv2
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -27,7 +25,6 @@ class RAFT(nn.Module):
     def __init__(self, args):
         super(RAFT, self).__init__()
         self.args = args
-        deform_bool = args.deform
 
         if args.small:
             self.hidden_dim = hdim = 96
@@ -47,24 +44,16 @@ class RAFT(nn.Module):
         if 'alternate_corr' not in self.args:
             self.args.alternate_corr = False
 
-
         # feature network, context network, and update block
         if args.small:
-            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout, deform_bool=False)
-            if args.fcbam:
-                self.fcbam = CBAM(128)        
-            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout, deform_bool=False)
-            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
+            self.fnet = SRSmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)        
+            self.cnet = SRSmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout)
+            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)
 
         else:
-            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout, deform_bool=False)        
-            if args.fcbam:
-                self.fcbam = CBAM(256)        
-            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout, deform_bool=False)
-            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim, deform_bool=deform_bool)
-          
-        if args.ccbam:
-            self.ccbam = CBAM(hdim+cdim)
+            self.fnet = SRBasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        
+            self.cnet = SRBasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)
+            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -96,15 +85,6 @@ class RAFT(nn.Module):
 
     def forward(self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False):
         """ Estimate optical flow between pair of frames """
-        # image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2HSV)
-        # image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2HSV)
-
-        # image1[:,:,0] /= 179.0
-        # image2[:,:,0] /= 179.0
-        # image1[:,:,1:] /= 255.0
-        # image2[:,:,1:] /= 255.0
-        # image1 = 2 * (image1) - 1.0
-        # image2 = 2 * (image2) - 1.0
 
         image1 = 2 * (image1 / 255.0) - 1.0
         image2 = 2 * (image2 / 255.0) - 1.0
@@ -117,11 +97,7 @@ class RAFT(nn.Module):
 
         # run the feature network
         with autocast(enabled=self.args.mixed_precision):
-            fnet = self.fnet([image1, image2])      
-            if self.args.fcbam:  
-                fnet = self.fcbam(fnet)
-            batch_dim = image1.shape[0]
-            fmap1, fmap2 = torch.split(fnet, [batch_dim, batch_dim], dim=0)
+            fmap1, fmap2 = self.fnet([image1, image2])        
         
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
@@ -133,8 +109,6 @@ class RAFT(nn.Module):
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
             cnet = self.cnet(image1)
-            if self.args.ccbam:
-                cnet = self.ccbam(cnet)
             net, inp = torch.split(cnet, [hdim, cdim], dim=1)
             net = torch.tanh(net)
             inp = torch.relu(inp)
@@ -153,7 +127,7 @@ class RAFT(nn.Module):
             with autocast(enabled=self.args.mixed_precision):
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
 
-            # F(t+1) = F(t) + Delta(t)
+            # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
 
             # upsample predictions
@@ -168,4 +142,3 @@ class RAFT(nn.Module):
             return coords1 - coords0, flow_up
             
         return flow_predictions
-
