@@ -48,6 +48,87 @@ class_boundary = list(np.arange(0, 16, 2))
 class_boundary.append(400)
 print(class_boundary)
 
+def compose_flow_single(flow1, flow2):
+    """
+    Compose optical flow from image a to c using optical flows from a to b and b to c.
+    Parameters:
+    flow1 : numpy.ndarray
+    Optical flow from image a to b, shape (h, w, 2).
+    flow2 : numpy.ndarray
+    Optical flow from image b to c, shape (h, w, 2).
+    Returns:
+    composed : numpy.ndarray
+    Optical flow from image a to c, shape (h, w, 2).
+    """
+    h, w = flow1.shape[:2]
+    x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
+
+    # Interpolate flow2
+    new_coords = np.vstack(x + flow2[:, :, 0], y + flow2[:, :, 1]).T
+    temp1 = ndimage.map_coordinates(x, new_coords)
+    temp2 = ndimage.map_coordinates(y, new_coords)
+
+    # Interpolate temp1 and temp2 with flow1
+    new_coords = np.vstack(x + flow1[:, :, 0], y + flow1[:, :, 1]).T
+    temp1 = ndimage.map_coordinates(temp1, new_coords)
+    temp2 = ndimage.map_coordinates(temp2, new_coords)
+
+    composed = np.zeros_like(flow1)
+    composed[:, :, 0] = temp1 - x
+    composed[:, :, 1] = temp2 - y
+
+
+
+    # h, w = flow1.shape[:2]
+    # grid_x, grid_y = torch.meshgrid(torch.arange(1, w + 1, dtype=flow1.dtype, device=flow1.device),
+    #                                  torch.arange(1, h + 1, dtype=flow1.dtype, device=flow1.device))
+
+    # # Interpolate flow2
+    # new_coords = torch.transpose(torch.vstack((grid_x + flow2[:, :, 0], grid_y + flow2[:, :, 1]), 0, 1)
+    # temp1 = torch.nn.functional.grid_sample(flow2.permute(2, 0, 1).unsqueeze(0), new_coords.view(1, -1, 1, 2), mode='bilinear', align_corners=True)
+    # temp1 = temp1.permute(0, 2, 3, 1).view(h, w, 2)
+
+    # # Interpolate temp1 with flow1
+    # new_coords = torch.transpose(torch.vstack((grid_x + flow1[:, :, 0], grid_y + flow1[:, :, 1])), 0, 1)
+    # temp2 = torch.nn.functional.grid_sample(temp1.permute(2, 0, 1).unsqueeze(0), new_coords.view(1, -1, 1, 2), mode='bilinear', align_corners=True)
+    # temp2 = temp2.permute(0, 2, 3, 1).view(h, w, 2)
+
+    # composed = torch.zeros_like(flow1)
+    # composed[:, :, 0] = temp2[:, :, 0] - grid_x
+    # composed[:, :, 1] = temp2[:, :, 1] - grid_y
+
+    return composed
+
+
+def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
+    n_predictions = len(flow_preds)    
+    flow_loss = 0.0
+    flow_composed_ls = []
+
+    for i in range(n_predictions):
+        i_weight = gamma**(n_predictions - i - 1)
+        flow_composed = compose_flow_single(flow_preds1[i].numpy(), flow_preds2[i].numpy())
+        flow_composed = torch.from_numpy(flow_composed, dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
+        flow_composed_ls += flow_composed
+        i_loss = (flow_composed - flow_preds12).abs()
+        flow_loss += i_weight * (valid[:, None] * i_loss).mean()
+
+    epe = torch.sum((flow_composed_ls[-2] - flow_preds12)**2, dim=1).sqrt()
+    epe = epe.view(-1)[valid.view(-1)]
+
+    # cross_entropy = loss(class_gt, flow_preds[-1])
+
+    metrics = {
+        # 'loss': flow_loss.item(),
+        'epe': epe.mean().item(),
+        '1px': (epe < 1).float().mean().item(),
+        '3px': (epe < 3).float().mean().item(),
+        '5px': (epe < 5).float().mean().item(),
+    }
+
+    return flow_loss
+
+
 
 def sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=MAX_FLOW):
     """ Loss function defined over sequence of flow predictions """
@@ -189,23 +270,35 @@ def train(args):
     logger = Logger(model, scheduler, total_steps)
 
     VAL_FREQ = 5000
-    add_noise = True
 
     should_keep_training = True
     while should_keep_training:
 
+        image1, image2, image3, image4 = None, None, None, None
+
+
         for i_batch, data_blob in enumerate(train_loader):
             optimizer.zero_grad()
-            image1, image2, flow, valid = [x.cuda() for x in data_blob]
+            if image1 is None:
+                image1, image2, flow1, valid = [x.cuda() for x in data_blob]
+                continue
+            else:
+                image3, image4, flow2, valid = [x.cuda() for x in data_blob]
+
 
             if args.add_noise:
                 stdv = np.random.uniform(0.0, 5.0)
                 image1 = (image1 + stdv * torch.randn(*image1.shape).cuda()).clamp(0.0, 255.0)
                 image2 = (image2 + stdv * torch.randn(*image2.shape).cuda()).clamp(0.0, 255.0)
 
-            flow_predictions = model(image1, image2, iters=args.iters)            
-
-            loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
+            if args.flow_composition:
+                flow_predictions12 = model(image1, image2, iters=args.iters)  
+                flow_predictions23 = model(image2, image3, iters=args.iters)     
+                flow_predictions13 = model(image1, image3, iters=args.iters)  
+                loss = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
+            else:
+                flow_predictions = model(image1, image2, iters=args.iters)            
+                loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
@@ -259,6 +352,8 @@ def train(args):
                 should_keep_training = False
                 break
 
+            image1, image2, image3, image4 = image3, image4, None, None
+
     logger.close()
     PATH = 'checkpoints/%s.pth' % args.name
     # torch.save(model.state_dict(), PATH)
@@ -295,11 +390,13 @@ if __name__ == '__main__':
     parser.add_argument('--clip', type=float, default=1.0)
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--add_noise', action='store_true')
+    parser.add_argument('--add_noise', action='store_true', default=False)
 
     parser.add_argument('--fcbam', help='Add CBAM after the feature network?', type=bool, default=False)
     parser.add_argument('--ccbam', help='Add CBAM after the context network?', type=bool, default=False)
     parser.add_argument('--deform', help='Add deformable convolution?', type=bool, default=False)
+    parser.add_argument('--flow_composition', type=bool, default=True)
+
 
     args = parser.parse_args()
 
