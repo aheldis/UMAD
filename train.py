@@ -154,7 +154,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         flow_loss += i_weight * i_loss.mean()
 
     epe = torch.sum((flow_composed_ls[-2] - flow_preds12[-2])**2, dim=1).sqrt()
-    epe = epe.view(-1)[valid.view(-1)]
+    epe = epe.view(-1)
 
     # cross_entropy = loss(class_gt, flow_preds[-1])
 
