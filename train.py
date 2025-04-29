@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from raft import RAFT
 import evaluate
 import core.datasets as datasets
+from scipy import ndimage
 
 from torch.utils.tensorboard import SummaryWriter
 
