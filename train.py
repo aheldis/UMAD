@@ -166,7 +166,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         '5px': (epe < 5).float().mean().item(),
     }
 
-    return flow_loss
+    return flow_loss, metrics
 
 
 
@@ -335,7 +335,7 @@ def train(args):
                 flow_predictions12 = model(image1, image2, iters=args.iters)  
                 flow_predictions23 = model(image2, image3, iters=args.iters)     
                 flow_predictions13 = model(image1, image3, iters=args.iters)  
-                loss = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
+                loss, metrics = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
                 loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
