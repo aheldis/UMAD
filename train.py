@@ -150,7 +150,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
 
         flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
         flow_composed_ls += flow_composed
-        i_loss = (flow_composed - flow_preds12).abs()
+        i_loss = (flow_composed - flow_preds12[i]).abs()
         flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
     epe = torch.sum((flow_composed_ls[-2] - flow_preds12[-2])**2, dim=1).sqrt()
