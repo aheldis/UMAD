@@ -78,13 +78,13 @@ def compose_flow_single(flow1, flow2):
     # temp1 = ndimage.map_coordinates(temp1, new_coords)
     # temp2 = ndimage.map_coordinates(temp2, new_coords)
 
-    coords2_x = x + flow1[0, :,:]
-    coords2_y = y + flow1[1, :,:]
+    coords2_x = x + flow1[0, :, :]
+    coords2_y = y + flow1[1, :, :]
     
     # Sample flow2 using map_coordinates (needs to be in pixel coordinates)
     # Note: map_coordinates expects coordinates in (x,y) order and array in (y,x) order
-    temp1 = map_coordinates(flow2[0, :,:], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
-    temp2 = map_coordinates(flow2[1, :,:], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
+    temp1 = ndimage.map_coordinates(flow2[0, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
+    temp2 = ndimage.map_coordinates(flow2[1, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
     
     composed = np.zeros_like(flow1)
     composed[0, :, :] = temp1 - x
