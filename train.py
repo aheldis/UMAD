@@ -54,30 +54,30 @@ def compose_flow_single(flow1, flow2):
     Compose optical flow from image a to c using optical flows from a to b and b to c.
     Parameters:
     flow1 : numpy.ndarray
-    Optical flow from image a to b, shape (h, w, 2).
+    Optical flow from image a to b, shape (2, h, w).
     flow2 : numpy.ndarray
-    Optical flow from image b to c, shape (h, w, 2).
+    Optical flow from image b to c, shape (2, h, w).
     Returns:
     composed : numpy.ndarray
-    Optical flow from image a to c, shape (h, w, 2).
+    Optical flow from image a to c, shape (2, h, w).
     """
-    h, w = flow1.shape[:2]
+    h, w = flow1.shape[1:]
     x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
 
     # Interpolate flow2
     print(x.shape, y.shape, flow2.shape)
-    new_coords = np.vstack((x + flow2[:, :, 0], y + flow2[:, :, 1])).T
+    new_coords = np.vstack((x + flow2[0, :, :], y + flow2[1, :, :])).T
     temp1 = ndimage.map_coordinates(x, new_coords)
     temp2 = ndimage.map_coordinates(y, new_coords)
 
     # Interpolate temp1 and temp2 with flow1
-    new_coords = np.vstack((x + flow1[:, :, 0], y + flow1[:, :, 1])).T
+    new_coords = np.vstack((x + flow1[0, :, :], y + flow1[1, :, :])).T
     temp1 = ndimage.map_coordinates(temp1, new_coords)
     temp2 = ndimage.map_coordinates(temp2, new_coords)
 
     composed = np.zeros_like(flow1)
-    composed[:, :, 0] = temp1 - x
-    composed[:, :, 1] = temp2 - y
+    composed[0, :, :] = temp1 - x
+    composed[1, :, :] = temp2 - y
 
 
 
