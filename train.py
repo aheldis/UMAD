@@ -107,7 +107,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
 
     for i in range(n_predictions):
         i_weight = gamma**(n_predictions - i - 1)
-        flow_composed = compose_flow_single(flow_preds1[i].cpu().numpy(), flow_preds2[i].cpu().numpy())
+        flow_composed = compose_flow_single(flow_preds1[i].cpu().detach().numpy(), flow_preds2[i].cpu().detach().numpy())
         flow_composed = torch.from_numpy(flow_composed, dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
         flow_composed_ls += flow_composed
         i_loss = (flow_composed - flow_preds12).abs()
