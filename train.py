@@ -67,6 +67,7 @@ def compose_flow_single(flow1, flow2):
     # Interpolate flow2
     print(x.shape, y.shape, flow2.shape)
     new_coords = np.vstack((x + flow2[0, :, :], y + flow2[1, :, :])).T
+    print(x.shape, y.shape, new_coords.shape)
     temp1 = ndimage.map_coordinates(x, new_coords)
     temp2 = ndimage.map_coordinates(y, new_coords)
 
