@@ -101,7 +101,7 @@ def compose_flow_single(flow1, flow2):
 
 
 def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
-    n_predictions = len(flow_preds)    
+    n_predictions = len(flow_preds1)    
     flow_loss = 0.0
     flow_composed_ls = []
 
