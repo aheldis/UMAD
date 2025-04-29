@@ -111,7 +111,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         batch1, batch2 = flow_preds1[i].cpu().detach().numpy(), flow_preds2[i].cpu().detach().numpy()
         flow_composed = np.zeros_like(batch1)
         
-        for b in len(batch1):
+        for b in range(len(batch1)):
             composed_batch[i] = compose_flow_single(flow_list1[i], flow_list2[i])
         
         flow_composed = torch.from_numpy(flow_composed, dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
