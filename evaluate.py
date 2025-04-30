@@ -129,13 +129,11 @@ def fgsm_attack(image, epsilon, data_grad):
     return perturbed_image
 
 
-#@torch.no_grad()
+@torch.no_grad()
 def validate_sintel(model, iters=32, train=True):
     """ Peform validation using the Sintel (train) split """
     model.eval()
     results = {}
-    if args.attack_type != 'None':
-        torch.set_grad_enabled(True)
 
     for dstype in ['clean', 'final']:
         val_dataset = datasets.MpiSintel(split='training', dstype=dstype, train=train)
@@ -149,46 +147,7 @@ def validate_sintel(model, iters=32, train=True):
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
 
-            if args.attack_type != 'None':
-                image1.requires_grad = True # for attack
-
             flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-
-            # start attack
-            ori = image1.data.clone().detach()
-            if args.attack_type != 'None':
-                if args.attack_type == "RAND":
-                    epsilon = args.epsilon
-                    shape = image1.shape
-                    delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
-                    image1.data = ori + torch.from_numpy(delta).type(torch.float).cuda()
-                    image1.data = torch.clamp(image1.data, 0.0, 255.0)
-                    flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-                    pgd_iters = 0
-                elif args.attack_type == 'FGSM':
-                    epsilon = args.epsilon
-                    pgd_iters = 1
-                else:
-                    epsilon = 2.5 * args.epsilon / args.iters
-                    pgd_iters = args.iters
-
-                for iter in range(pgd_iters):
-                    flow = padder.unpad(flow_pr[0])
-                    epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-                    model.zero_grad()
-                    image1.requires_grad = True
-                    # print(epe.mean())
-                    epe.mean().backward()
-                    data_grad = image1.grad.data
-                    args.channel = int(args.channel)
-                    if args.channel == -1:
-                        image1.data = fgsm_attack(image1, epsilon, data_grad)
-                    else:
-                        image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
-                    if args.attack_type == 'PGD':
-                        image1.data = ori + torch.clamp(image1.data - ori, -args.epsilon, args.epsilon)
-                    flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-            # end attack
 
             flow = padder.unpad(flow_pr[0]).cpu()
 
@@ -207,12 +166,10 @@ def validate_sintel(model, iters=32, train=True):
     return results
 
 
-# @torch.no_grad()
+@torch.no_grad()
 def validate_kitti(model, iters=24):
     """ Peform validation using the KITTI-2015 (train) split """
     model.eval()
-    if args.attack_type != 'None':
-        torch.set_grad_enabled(True) 
     val_dataset = datasets.KITTI(split='training')
 
 
@@ -224,50 +181,8 @@ def validate_kitti(model, iters=24):
 
         padder = InputPadder(image1.shape, mode='kitti')
         image1, image2 = padder.pad(image1, image2)
-        # print(torch.min(image1), torch.max(image1)) 0, 255
-        if args.attack_type != 'None':
-            image1.requires_grad = True # for attack
 
-        flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        # start attack
-        ori = image1.data.clone().detach()
-        if args.attack_type != 'None':
-            if args.attack_type == "RAND":
-                epsilon = args.epsilon
-                shape = image1.shape
-                delta = (np.random.rand(np.product(shape)).reshape(shape) - 0.5) * 2 * epsilon
-                image1.data = ori + torch.from_numpy(delta).type(torch.float).cuda()
-                image1.data = torch.clamp(image1.data, 0.0, 255.0)
-                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-                pgd_iters = 0
-            elif args.attack_type == 'FGSM':
-                epsilon = args.epsilon
-                pgd_iters = 1
-            else:
-                epsilon = 2.5 * args.epsilon / args.iters
-                pgd_iters = args.iters
-        
-            for iter in range(pgd_iters):
-                flow = padder.unpad(flow_pr[0])
-                epe = torch.sum((flow - flow_gt.cuda())**2, dim=0).sqrt().view(-1)
-                model.zero_grad()
-                image1.requires_grad = True
-                epe.mean().backward()
-                data_grad = image1.grad.data
-                args.channel = int(args.channel)
-                if args.channel == -1:
-                    image1.data = fgsm_attack(image1, epsilon, data_grad)
-                else:
-                    image1.data[:, args.channel, :, :] = fgsm_attack(image1, epsilon, data_grad)[:, args.channel, :, :]
-                if args.attack_type == 'PGD':
-                    offset = image1.data - ori
-                    image1.data = ori + torch.clamp(offset, -args.epsilon, args.epsilon)
-                flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-              
-        # viz(args, image1.cpu().detach(), image2.cpu().detach(), (image1.data - ori).cpu().detach(), flow_pr.cpu().detach(), args.name)
-
-        
-        # end attack
+        flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)   
         flow = padder.unpad(flow_pr[0]).cpu()
 
         epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()
