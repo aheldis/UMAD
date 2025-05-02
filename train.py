@@ -421,7 +421,7 @@ if __name__ == '__main__':
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--validation', type=str, nargs='+')
 
-    parser.add_argument('--lr', type=float, default=0.00002)
+    parser.add_argument('--lr', type=float, default=0.000001) # 0.00002
     parser.add_argument('--num_steps', type=int, default=100000)
     parser.add_argument('--batch_size', type=int, default=6)
     parser.add_argument('--image_size', type=int, nargs='+', default=[384, 512])
