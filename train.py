@@ -51,88 +51,88 @@ class_boundary = list(np.arange(0, 16, 2))
 class_boundary.append(400)
 print(class_boundary)
 
-def compose_flow_single(flow1, flow2):
-    """
-    Compose optical flow from image a to c using optical flows from a to b and b to c.
-    Parameters:
-    flow1 : numpy.ndarray
-    Optical flow from image a to b, shape (2, h, w).
-    flow2 : numpy.ndarray
-    Optical flow from image b to c, shape (2, h, w).
-    Returns:
-    composed : numpy.ndarray
-    Optical flow from image a to c, shape (2, h, w).
-    """
-    h, w = flow1.shape[1:]
-    x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
-
-    coords2_x = x + flow1[0, :, :]
-    coords2_y = y + flow1[1, :, :]
-    
-    # Sample flow2 using map_coordinates (needs to be in pixel coordinates)
-    # Note: map_coordinates expects coordinates in (x,y) order and array in (y,x) order
-    temp1 = ndimage.map_coordinates(flow2[0, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
-    temp2 = ndimage.map_coordinates(flow2[1, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
-    
-    composed = np.zeros_like(flow1)
-    composed[0, :, :] = temp1 - x
-    composed[1, :, :] = temp2 - y
-
-    return composed
-
 # def compose_flow_single(flow1, flow2):
 #     """
 #     Compose optical flow from image a to c using optical flows from a to b and b to c.
-    
 #     Parameters:
-#     flow1 : torch.Tensor
-#         Optical flow from image a to b, shape (2, h, w)
-#     flow2 : torch.Tensor
-#         Optical flow from image b to c, shape (2, h, w)
-    
+#     flow1 : numpy.ndarray
+#     Optical flow from image a to b, shape (2, h, w).
+#     flow2 : numpy.ndarray
+#     Optical flow from image b to c, shape (2, h, w).
 #     Returns:
-#     composed : torch.Tensor
-#         Optical flow from image a to c, shape (2, h, w)
+#     composed : numpy.ndarray
+#     Optical flow from image a to c, shape (2, h, w).
 #     """
 #     h, w = flow1.shape[1:]
+#     x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
+
+#     coords2_x = x + flow1[0, :, :]
+#     coords2_y = y + flow1[1, :, :]
     
-#     # Create grid coordinates (1-based indexing like MATLAB)
-#     x = torch.arange(1, w + 1, dtype=flow1.dtype, device=flow1.device)
-#     y = torch.arange(1, h + 1, dtype=flow1.dtype, device=flow1.device)
-#     grid_y, grid_x = torch.meshgrid(y, x, indexing='ij')
+#     # Sample flow2 using map_coordinates (needs to be in pixel coordinates)
+#     # Note: map_coordinates expects coordinates in (x,y) order and array in (y,x) order
+#     temp1 = ndimage.map_coordinates(flow2[0, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
+#     temp2 = ndimage.map_coordinates(flow2[1, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
     
-#     # Compute sampling coordinates for flow2
-#     coords_x = grid_x + flow1[0]
-#     coords_y = grid_y + flow1[1]
-    
-#     # Normalize coordinates to [-1, 1] range for grid_sample
-#     # Note: grid_sample expects coordinates in range [-1,1] where (-1,-1) is top-left
-#     # and (1,1) is bottom-right of the image
-#     coords_x_normalized = (2.0 * coords_x / (w + 1)) - 1.0
-#     coords_y_normalized = (2.0 * coords_y / (h + 1)) - 1.0
-    
-#     # Combine coordinates into grid tensor (shape [h, w, 2])
-#     sampling_grid = torch.stack([coords_x_normalized, coords_y_normalized], dim=-1)
-    
-#     # Add batch dimension for grid_sample (input needs [N, C, H, W])
-#     flow2_batched = flow2.unsqueeze(0)
-#     sampling_grid_batched = sampling_grid.unsqueeze(0)
-    
-#     # Sample flow2 using bilinear interpolation
-#     sampled_flow = F.grid_sample(
-#         flow2_batched,
-#         sampling_grid_batched,
-#         mode='bilinear',
-#         padding_mode='zeros',
-#         align_corners=False
-#     )
-    
-#     # Remove batch dimension and compute composed flow
-#     composed = torch.zeros_like(flow1)
-#     composed[0] = sampled_flow[0, 0] + flow1[0] - grid_x
-#     composed[1] = sampled_flow[0, 1] + flow1[1] - grid_y
-    
+#     composed = np.zeros_like(flow1)
+#     composed[0, :, :] = temp1 - x
+#     composed[1, :, :] = temp2 - y
+
 #     return composed
+
+def compose_flow_single(flow1, flow2):
+    """
+    Compose optical flow from image a to c using optical flows from a to b and b to c.
+    
+    Parameters:
+    flow1 : torch.Tensor
+        Optical flow from image a to b, shape (2, h, w)
+    flow2 : torch.Tensor
+        Optical flow from image b to c, shape (2, h, w)
+    
+    Returns:
+    composed : torch.Tensor
+        Optical flow from image a to c, shape (2, h, w)
+    """
+    h, w = flow1.shape[1:]
+    
+    # Create grid coordinates (1-based indexing like MATLAB)
+    x = torch.arange(1, w + 1, dtype=flow1.dtype, device=flow1.device)
+    y = torch.arange(1, h + 1, dtype=flow1.dtype, device=flow1.device)
+    grid_y, grid_x = torch.meshgrid(y, x, indexing='ij')
+    
+    # Compute sampling coordinates for flow2
+    coords_x = grid_x + flow1[0]
+    coords_y = grid_y + flow1[1]
+    
+    # Normalize coordinates to [-1, 1] range for grid_sample
+    # Note: grid_sample expects coordinates in range [-1,1] where (-1,-1) is top-left
+    # and (1,1) is bottom-right of the image
+    coords_x_normalized = (2.0 * coords_x / (w + 1)) - 1.0
+    coords_y_normalized = (2.0 * coords_y / (h + 1)) - 1.0
+    
+    # Combine coordinates into grid tensor (shape [h, w, 2])
+    sampling_grid = torch.stack([coords_x_normalized, coords_y_normalized], dim=-1)
+    
+    # Add batch dimension for grid_sample (input needs [N, C, H, W])
+    flow2_batched = flow2.unsqueeze(0)
+    sampling_grid_batched = sampling_grid.unsqueeze(0)
+    
+    # Sample flow2 using bilinear interpolation
+    sampled_flow = F.grid_sample(
+        flow2_batched,
+        sampling_grid_batched,
+        mode='bilinear',
+        padding_mode='zeros',
+        align_corners=False
+    )
+    
+    # Remove batch dimension and compute composed flow
+    composed = torch.zeros_like(flow1)
+    composed[0] = sampled_flow[0, 0] + flow1[0] - grid_x
+    composed[1] = sampled_flow[0, 1] + flow1[1] - grid_y
+    
+    return composed
 
 
 def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
@@ -142,16 +142,16 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
 
     for i in range(n_predictions):
         i_weight = gamma**(n_predictions - i - 1)
-        batch1, batch2 = flow_preds1[i].cpu().detach().numpy(), flow_preds2[i].cpu().detach().numpy()
-        flow_composed = np.zeros_like(batch1)
+        # batch1, batch2 = flow_preds1[i].cpu().detach().numpy(), flow_preds2[i].cpu().detach().numpy()
+        # flow_composed = np.zeros_like(batch1)
 
-        # batch1, batch2 = flow_preds1[i], flow_preds2[i]
-        # flow_composed = torch.zeros_like(batch1)
+        batch1, batch2 = flow_preds1[i], flow_preds2[i]
+        flow_composed = torch.zeros_like(batch1)
         
         for b in range(len(batch1)):
             flow_composed[b] = compose_flow_single(batch1[b], batch2[b])
 
-        flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
+        # flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
         
         flow_composed_ls += flow_composed
         i_loss = (flow_composed - flow_preds12[i]).abs()
