@@ -83,6 +83,7 @@ print(class_boundary)
 
 
 def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
+    print(img[0].shape, img2[0].shape, gt_flo[0].shape, flo[0].shape)
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
