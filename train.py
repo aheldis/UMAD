@@ -207,7 +207,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         '5px': (epe < 5).float().mean().item(),
     }
 
-    return flow_loss, metrics, flow_composed[0]
+    return flow_loss, metrics, flow_composed_ls[-2]
 
 
 
