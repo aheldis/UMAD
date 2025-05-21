@@ -376,7 +376,7 @@ def train(args):
                 flow_predictions23 = model(image2, image3, iters=args.iters)     
                 flow_predictions13 = model(image1, image3, iters=args.iters)  
                 loss, metrics, composed = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
-                viz(image1[0], image3[0], composed[0], flow_predictions13[0])
+                viz(image1, image3, composed, flow_predictions13)
                 exit()
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
