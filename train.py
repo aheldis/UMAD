@@ -21,6 +21,7 @@ import evaluate
 import core.datasets as datasets
 from scipy import ndimage
 from scipy.interpolate import interp2d
+from utils import flow_viz
 
 
 from torch.utils.tensorboard import SummaryWriter
@@ -78,7 +79,42 @@ print(class_boundary)
 #     composed[0, :, :] = temp1 - x
 #     composed[1, :, :] = temp2 - y
 
-#     return composed
+#     return composedn
+
+
+def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
+    img = img1[0].permute(1,2,0).cpu().numpy()
+    img2 = img2[0].permute(1,2,0).cpu().numpy()
+    gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
+    flo = flo[0].permute(1,2,0).cpu().numpy()
+
+    gt_flo = flow_viz.flow_to_image(gt_flo)
+    flo = flow_viz.flow_to_image(flo)
+
+    try:
+        os.mkdir(args.output_path)
+    except Exception as e:
+        pass
+    
+    if len(path):
+        try:
+            os.mkdir(os.path.join(args.output_path, path))
+        except Exception as e:
+            pass
+    
+    output_path = path
+
+    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/gt_flow_' + _id + '.png')
+    flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/composed_flow_' + _id + '.png')
+
+    flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/' + 'image1' + _id + '.png')
+    flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/' + 'image2' + _id + '.png')
+
+
 
 def compose_flow_single(flow1, flow2):
     """
@@ -170,7 +206,7 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         '5px': (epe < 5).float().mean().item(),
     }
 
-    return flow_loss, metrics
+    return flow_loss, metrics, flow_composed
 
 
 
@@ -339,7 +375,9 @@ def train(args):
                 flow_predictions12 = model(image1, image2, iters=args.iters)  
                 flow_predictions23 = model(image2, image3, iters=args.iters)     
                 flow_predictions13 = model(image1, image3, iters=args.iters)  
-                loss, metrics = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
+                loss, metrics, composed = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
+                viz(image1[0], image3[0], composed[0], flow_predictions13[0])
+                exit()
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
                 loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
