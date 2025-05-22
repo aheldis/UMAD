@@ -93,6 +93,11 @@ def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
     gt_flo = flow_viz.flow_to_image(gt_flo)
     flo = flow_viz.flow_to_image(flo)
 
+
+
+    entries = os.listdir(path)
+    print(entries)
+
     try:
         os.mkdir(args.output_path)
     except Exception as e:
