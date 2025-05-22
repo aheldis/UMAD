@@ -83,7 +83,7 @@ print(class_boundary)
 
 
 def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
-    print(img1[0].shape, img2[0].shape, gt_flo[0].shape, flo[0].shape)
+    print(img1[0].shape, img2[0].shape, flo[0].shape, gt_flo[0].shape)
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
@@ -379,7 +379,7 @@ def train(args):
                 flow_predictions23 = model(image2, image3, iters=args.iters)     
                 flow_predictions13 = model(image1, image3, iters=args.iters)  
                 loss, metrics, composed = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
-                viz(image1, image3, composed, flow_predictions13)
+                viz(image1, image3, composed, flow_predictions13[-2])
                 exit()
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
