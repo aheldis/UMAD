@@ -188,9 +188,11 @@ def composition_loss(flow_preds1, flow_preds2, flow_preds12, gamma):
         for b in range(len(batch1)):
             flow_composed[b] = compose_flow_single(batch1[b], batch2[b])
 
+        print(flow_composed.shape)
+
         # flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
         
-        flow_composed_ls += flow_composed
+        flow_composed_ls.append(flow_composed)
         i_loss = (flow_composed - flow_preds12[i]).abs()
         flow_loss += i_weight * i_loss.mean()
 
