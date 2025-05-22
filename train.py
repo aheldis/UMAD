@@ -22,6 +22,7 @@ import core.datasets as datasets
 from scipy import ndimage
 from scipy.interpolate import interp2d
 from utils import flow_viz
+from PIL import Image, ImageOps
 
 
 from torch.utils.tensorboard import SummaryWriter
