@@ -95,31 +95,31 @@ def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
 
 
 
-    entries = os.listdir(path)
-    print(entries)
+    # entries = os.listdir(path)
+    # print(entries)
 
-    try:
-        os.mkdir(args.output_path)
-    except Exception as e:
-        pass
+    # try:
+    #     os.mkdir(args.output_path)
+    # except Exception as e:
+    #     pass
     
-    if len(path):
-        try:
-            os.mkdir(os.path.join(args.output_path, path))
-        except Exception as e:
-            pass
+    # if len(path):
+    #     try:
+    #         os.mkdir(os.path.join(args.output_path, path))
+    #     except Exception as e:
+    #         pass
     
     output_path = path
 
     flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/gt_flow_' + _id + '.png')
+    flox_rgb.save(output_path + 'gt_flow_' + _id + '.png')
     flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/composed_flow_' + _id + '.png')
+    flox_rgb.save(output_path + 'composed_flow_' + _id + '.png')
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'image1' + _id + '.png')
+    flox_rgb.save(output_path + 'image1' + _id + '.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'image2' + _id + '.png')
+    flox_rgb.save(output_path + 'image2' + _id + '.png')
 
 
 
