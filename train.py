@@ -363,22 +363,17 @@ def train(args):
     should_keep_training = True
     while should_keep_training:
 
-        image1, image2, image3, image4 = None, None, None, None
-
-
         for i_batch, data_blob in enumerate(train_loader):
             optimizer.zero_grad()
-            if image1 is None:
-                image1, image2, flow1, valid = [x.cuda() for x in data_blob]
-                continue
-            else:
-                image3, image4, flow2, valid = [x.cuda() for x in data_blob]
+            image1, image2, image3, flow1, flow2, valid = [x.cuda() for x in data_blob]
 
 
             if args.add_noise:
                 stdv = np.random.uniform(0.0, 5.0)
                 image1 = (image1 + stdv * torch.randn(*image1.shape).cuda()).clamp(0.0, 255.0)
                 image2 = (image2 + stdv * torch.randn(*image2.shape).cuda()).clamp(0.0, 255.0)
+                image3 = (image3 + stdv * torch.randn(*image2.shape).cuda()).clamp(0.0, 255.0)
+
 
             if args.flow_composition:
                 flow_predictions12 = model(image1, image2, iters=args.iters)  
@@ -442,8 +437,6 @@ def train(args):
             if total_steps > args.num_steps:
                 should_keep_training = False
                 break
-
-            image1, image2, image3, image4 = image3, image4, None, None
 
     logger.close()
     PATH = 'checkpoints/%s.pth' % args.name

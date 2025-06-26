@@ -56,36 +56,53 @@ class FlowDataset(data.Dataset):
 
         flow = None
         if len(self.flow_list) != 0 and self.sparse:
-            flow, valid = frame_utils.readFlowKITTI(self.flow_list[index])
+            flow, valid = frame_utils.readFlowKITTI(self.flow_list[index][0])
         elif len(self.flow_list) != 0:
-            flow = frame_utils.read_gen(self.flow_list[index])
+            flow = frame_utils.read_gen(self.flow_list[index][0])
+            flow1 = frame_utils.read_gen(self.flow_list[index][0])
+            flow2 = frame_utils.read_gen(self.flow_list[index][1])
+
 
         img1 = frame_utils.read_gen(self.image_list[index][0])
         img2 = frame_utils.read_gen(self.image_list[index][1])
+        img3 = frame_utils.read_gen(self.image_list[index][2])
+
 
         if flow is not None:
             flow = np.array(flow).astype(np.float32)
+            flow1 = np.array(flow1).astype(np.float32)
+            flow2 = np.array(flow2).astype(np.float32)
         img1 = np.array(img1).astype(np.uint8)
         img2 = np.array(img2).astype(np.uint8)
+        img3 = np.array(img3).astype(np.uint8)
 
         # grayscale images
         if len(img1.shape) == 2:
             img1 = np.tile(img1[...,None], (1, 1, 3))
             img2 = np.tile(img2[...,None], (1, 1, 3))
+            img3 = np.tile(img3[...,None], (1, 1, 3))
         else:
             img1 = img1[..., :3]
             img2 = img2[..., :3]
+            img3 = img3[..., :3]
 
         if self.augmentor is not None:
             if self.sparse:
-                img1, img2, flow, valid = self.augmentor(img1, img2, flow, valid)
+                img1, img2, flow1, valid = self.augmentor(img1, img2, flow1, valid)
+                img2, img3, flow2, valid = self.augmentor(img2, img3, flow2, valid)
+
             else:
-                img1, img2, flow = self.augmentor(img1, img2, flow)
+                img1, img2, flow1 = self.augmentor(img1, img2, flow1)
+                img2, img3, flow2 = self.augmentor(img2, img3, flow2)
+
 
         img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
         img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+        img3 = torch.from_numpy(img3).permute(2, 0, 1).float()
         if len(self.flow_list) != 0:
             flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+            flow1 = torch.from_numpy(flow1).permute(2, 0, 1).float()
+            flow2 = torch.from_numpy(flow2).permute(2, 0, 1).float()
 
         if valid is not None:
             valid = torch.from_numpy(valid)
@@ -94,7 +111,7 @@ class FlowDataset(data.Dataset):
         else:
             return img1, img2
 
-        return img1, img2, flow, valid.float()
+        return img1, img2, img3, flow1, flow2, valid.float()
 
 
     def __rmul__(self, v):
@@ -122,11 +139,13 @@ class MpiSintel(FlowDataset):
             #     continue
             # print("scene:", scene)
             image_list = sorted(glob(osp.join(image_root, scene, '*.png')))
-            for i in range(len(image_list)-1):
-                self.image_list += [ [image_list[i], image_list[i+1]] ]
+            flow_list += sorted(glob(osp.join(flow_root, scene, '*.flo')))
+
+            for i in range(len(image_list)-2):
+                self.image_list += [ [image_list[i], image_list[i+1], image_list[i+2]] ]
                 self.extra_info += [ (scene, i) ] # scene and frame_id
             if split != 'test':
-                self.flow_list += sorted(glob(osp.join(flow_root, scene, '*.flo')))
+                self.flow_list += [ [flow_list[i], flow_list[i+1]] ]
 
 
 class FlyingChairs(FlowDataset):
