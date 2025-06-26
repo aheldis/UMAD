@@ -88,12 +88,14 @@ class FlowDataset(data.Dataset):
 
         if self.augmentor is not None:
             if self.sparse:
+                pre_image = img2
                 img1, img2, flow1, valid = self.augmentor(img1, img2, flow1, valid)
-                img2, img3, flow2, valid = self.augmentor(img2, img3, flow2, valid)
+                img2, img3, flow2, valid = self.augmentor(pre_image, img3, flow2, valid)
 
             else:
+                pre_image = img2
                 img1, img2, flow1 = self.augmentor(img1, img2, flow1)
-                img2, img3, flow2 = self.augmentor(img2, img3, flow2)
+                img2, img3, flow2 = self.augmentor(pre_image, img3, flow2)
 
 
         img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
