@@ -146,8 +146,10 @@ class MpiSintel(FlowDataset):
             for i in range(len(image_list)-2):
                 self.image_list += [ [image_list[i], image_list[i+1], image_list[i+2]] ]
                 self.extra_info += [ (scene, i) ] # scene and frame_id
-            if split != 'test':
-                self.flow_list += [ [flow_list[i], flow_list[i+1]] ]
+
+                if split != 'test':
+                    self.flow_list += [ [flow_list[i], flow_list[i+1]] ]
+        # print("MPI SINTEL:", len(self.flow_list))
 
 
 class FlyingChairs(FlowDataset):
