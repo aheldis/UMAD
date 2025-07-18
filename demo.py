@@ -258,7 +258,7 @@ def compose(args):
             flow_13 = flow_up
 
 
-            composed = compose_flow_batch(torch.unsqueeze(flow_12, dim=0).unsqueeze(0), torch.unsqueeze(flow_23, dim=0).unsqueeze(0))[0]
+            composed = compose_flow_batch(flow_12, flow_23)
             
             folder_name = path[len(args.path) + 1:]
             viz(args, image1.detach(), image3.detach(), flow_13.detach(), composed.detach(), folder_name, str(_id))
