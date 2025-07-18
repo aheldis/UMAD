@@ -200,7 +200,7 @@ def demo(args):
 
 
 def compose(args):
-    from train import compose_flow_single, compose_flow_batch
+    from train import compose_flow_batch
     transform = T.Resize((240, 427))
 
     torch.cuda.empty_cache()
