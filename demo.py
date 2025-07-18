@@ -13,7 +13,6 @@ from raft import RAFT
 from utils import flow_viz
 from utils.utils import InputPadder
 import torchvision.transforms as T
-from train import compose_flow_batch
 
 
 
@@ -201,6 +200,7 @@ def demo(args):
 
 
 def compose(args):
+    from train import compose_flow_batch
     transform = T.Resize((240, 427))
 
     torch.cuda.empty_cache()
