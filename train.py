@@ -235,8 +235,8 @@ def compose_flow_batch(flow1, flow2):
 
     # --- 2. Create a base grid of pixel coordinates ---
     # This grid represents the original pixel locations 'p'.
-    x_coords = torch.linspace(0, W - 1, W, device=device)
-    y_coords = torch.linspace(0, H - 1, H, device=device)
+    x_coords = torch.linspace(0, W - 1, W, device=flow1.device)
+    y_coords = torch.linspace(0, H - 1, H, device=flow1.device)
     grid_y, grid_x = torch.meshgrid(y_coords, x_coords, indexing='ij')
     base_grid_pixels = torch.stack((grid_x, grid_y), dim=2) # Shape: (H, W, 2)
     
@@ -251,7 +251,7 @@ def compose_flow_batch(flow1, flow2):
 
     # --- 4. Normalize the sampling grid for grid_sample ---
     # grid_sample requires coordinates in the range [-1, 1].
-    norm_factor = torch.tensor([W - 1, H - 1], dtype=torch.float32, device=device)
+    norm_factor = torch.tensor([W - 1, H - 1], dtype=torch.float32, device=flow1.device)
     normalized_sampling_grid = 2.0 * (sampling_grid_pixels / norm_factor) - 1.0
 
     # --- 5. Warp the second flow field using grid_sample ---

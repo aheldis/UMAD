@@ -82,9 +82,9 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
 
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'img1' + _id + '.png')
+    flox_rgb.save(output_path + '/' + 'img1_' + _id + '.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'img3' + _id + '.png')
+    flox_rgb.save(output_path + '/' + 'img3_' + _id + '.png')
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
