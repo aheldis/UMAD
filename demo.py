@@ -249,13 +249,13 @@ def compose(args):
             image1, image2, image3 = padder.pad(image1, image2, image3)
 
             flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
-            flow_12 = padder.unpad(flow_up[0])
+            flow_12 = flow_up
 
             flow_low, flow_up = model(image2, image3, iters=20, test_mode=True)
-            flow_23 = padder.unpad(flow_up[0])
+            flow_23 = flow_up
 
             flow_low, flow_up = model(image1, image3, iters=20, test_mode=True)
-            flow_13 = padder.unpad(flow_up[0])
+            flow_13 = flow_up
 
 
             composed = compose_flow_batch(torch.unsqueeze(flow_12, dim=0), torch.unsqueeze(flow_23, dim=0))[0]
