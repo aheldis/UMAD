@@ -82,9 +82,9 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
 
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'attacked_img' + _id + '.png')
+    flox_rgb.save(output_path + '/' + 'img1' + _id + '.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
-    flox_rgb.save(output_path + '/' + 'noise' + _id + '.png')
+    flox_rgb.save(output_path + '/' + 'img3' + _id + '.png')
 
     # import matplotlib.pyplot as plt
     # plt.imshow(img_flo / 255.0)
@@ -200,7 +200,7 @@ def demo(args):
 
 
 def compose(args):
-    from train import compose_flow_batch
+    from train import compose_flow_single
     transform = T.Resize((240, 427))
 
     torch.cuda.empty_cache()
@@ -258,7 +258,13 @@ def compose(args):
             flow_13 = flow_up
 
 
-            composed = compose_flow_batch(flow_12, flow_23)
+            # composed = compose_flow_batch(flow_12, flow_23)
+
+            batch1, batch2 = flow_12.cpu().detach().numpy(), flow_23.cpu().detach().numpy()
+            flow_composed = compose_flow_single(batch1[0], batch2[0])
+
+            flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_preds1[i].dtype, device=flow_preds1[i].device)
+        
             
             folder_name = path[len(args.path) + 1:]
             viz(args, image1.detach(), image3.detach(), flow_13.detach(), composed.detach(), folder_name, str(_id))

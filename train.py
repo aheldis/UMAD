@@ -53,34 +53,34 @@ class_boundary = list(np.arange(0, 16, 2))
 class_boundary.append(400)
 print(class_boundary)
 
-# def compose_flow_single(flow1, flow2):
-#     """
-#     Compose optical flow from image a to c using optical flows from a to b and b to c.
-#     Parameters:
-#     flow1 : numpy.ndarray
-#     Optical flow from image a to b, shape (2, h, w).
-#     flow2 : numpy.ndarray
-#     Optical flow from image b to c, shape (2, h, w).
-#     Returns:
-#     composed : numpy.ndarray
-#     Optical flow from image a to c, shape (2, h, w).
-#     """
-#     h, w = flow1.shape[1:]
-#     x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
+def compose_flow_single(flow1, flow2):
+    """
+    Compose optical flow from image a to c using optical flows from a to b and b to c.
+    Parameters:
+    flow1 : numpy.ndarray
+    Optical flow from image a to b, shape (2, h, w).
+    flow2 : numpy.ndarray
+    Optical flow from image b to c, shape (2, h, w).
+    Returns:
+    composed : numpy.ndarray
+    Optical flow from image a to c, shape (2, h, w).
+    """
+    h, w = flow1.shape[1:]
+    x, y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
 
-#     coords2_x = x + flow1[0, :, :]
-#     coords2_y = y + flow1[1, :, :]
+    coords2_x = x + flow1[0, :, :]
+    coords2_y = y + flow1[1, :, :]
     
-#     # Sample flow2 using map_coordinates (needs to be in pixel coordinates)
-#     # Note: map_coordinates expects coordinates in (x,y) order and array in (y,x) order
-#     temp1 = ndimage.map_coordinates(flow2[0, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
-#     temp2 = ndimage.map_coordinates(flow2[1, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
+    # Sample flow2 using map_coordinates (needs to be in pixel coordinates)
+    # Note: map_coordinates expects coordinates in (x,y) order and array in (y,x) order
+    temp1 = ndimage.map_coordinates(flow2[0, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
+    temp2 = ndimage.map_coordinates(flow2[1, :, :], [coords2_y, coords2_x], order=1, mode='constant', cval=0)
     
-#     composed = np.zeros_like(flow1)
-#     composed[0, :, :] = temp1 - x
-#     composed[1, :, :] = temp2 - y
+    composed = np.zeros_like(flow1)
+    composed[0, :, :] = temp1 - x
+    composed[1, :, :] = temp2 - y
 
-#     return composed
+    return composed
 
 
 def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
