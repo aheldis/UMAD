@@ -200,7 +200,7 @@ def demo(args):
 
 
 def compose(args):
-    from train import compose_flow_single
+    from train import compose_flow_single, compose_flow_batch
     transform = T.Resize((240, 427))
 
     torch.cuda.empty_cache()
@@ -258,12 +258,12 @@ def compose(args):
             flow_13 = flow_up
 
 
-            # composed = compose_flow_batch(flow_12, flow_23)
+            composed = compose_flow_batch(flow_12, flow_23)
 
-            batch1, batch2 = flow_12.cpu().detach().numpy(), flow_23.cpu().detach().numpy()
-            flow_composed = compose_flow_single(batch1[0], batch2[0])
+            # batch1, batch2 = flow_12.cpu().detach().numpy(), flow_23.cpu().detach().numpy()
+            # flow_composed = compose_flow_single(batch1[0], batch2[0])
 
-            composed = torch.from_numpy(flow_composed).to(dtype=flow_12.dtype, device=flow_12.device).unsqueeze(0)
+            # composed = torch.from_numpy(flow_composed).to(dtype=flow_12.dtype, device=flow_12.device).unsqueeze(0)
         
             
             folder_name = path[len(args.path) + 1:]
