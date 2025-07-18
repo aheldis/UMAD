@@ -246,7 +246,7 @@ def compose_flow_batch(flow1, flow2):
     # --- 3. Calculate target sampling coordinates in pixel space ---
     # The target coordinates are p' = p + flow1(p).
     # We need to reshape flow1 to match the grid for addition.
-    flow1_for_grid = flow1_tensor.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
+    flow1_for_grid = flow1.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
     sampling_grid_pixels = batch_base_grid + flow1_for_grid # Shape: (N, H, W, 2)
 
     # --- 4. Normalize the sampling grid for grid_sample ---
