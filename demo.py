@@ -263,7 +263,7 @@ def compose(args):
             batch1, batch2 = flow_12.cpu().detach().numpy(), flow_23.cpu().detach().numpy()
             flow_composed = compose_flow_single(batch1[0], batch2[0])
 
-            flow_composed = torch.from_numpy(flow_composed).to(dtype=flow_12[i].dtype, device=flow_12[i].device)
+            composed = torch.from_numpy(flow_composed).to(dtype=flow_12[i].dtype, device=flow_12[i].device)
         
             
             folder_name = path[len(args.path) + 1:]
