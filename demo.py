@@ -268,7 +268,8 @@ def compose(args):
             
             folder_name = path[len(args.path) + 1:]
             viz(args, image1.detach(), image3.detach(), flow_13.detach(), composed.detach(), folder_name, str(_id))
-            exit()
+            _id += 1
+            
 
 
             
