@@ -13,6 +13,7 @@ from raft import RAFT
 from utils import flow_viz
 from utils.utils import InputPadder
 import torchvision.transforms as T
+from train import compose_flow_batch
 
 
 
@@ -75,10 +76,11 @@ def viz(args, img1, img2, flo, gt_flo, path, _id):
     if len(path): 
         output_path = os.path.join(args.output_path, path)
 
-    # flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
-    # flox_rgb.save(output_path + '/diff_flow_' + _id + '.png')
-    # flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
-    # flox_rgb.save(output_path + '/predicted_flow_' + _id + '.png')
+    flox_rgb = Image.fromarray(flo.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/pred_flow_' + _id + '.png')
+    flox_rgb = Image.fromarray(gt_flo.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + '/composed_flow_' + _id + '.png')
+
 
     flox_rgb = Image.fromarray(img.astype('uint8'), 'RGB')
     flox_rgb.save(output_path + '/' + 'attacked_img' + _id + '.png')
@@ -198,6 +200,72 @@ def demo(args):
     print("Average EPE:", aepe)
 
 
+def compose(args):
+    transform = T.Resize((240, 427))
+
+    torch.cuda.empty_cache()
+
+    model = torch.nn.DataParallel(RAFT(args))
+    if not args.raft:
+        checkpoint = torch.load(args.model)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(torch.load(args.model))
+
+    model = model.module
+    model.to(DEVICE)
+    model.eval()
+
+    # with torch.no_grad():
+    paths = []
+    for entry in os.scandir(args.path):
+        if entry.is_dir():
+            new_path = args.path + '/' + entry.name
+            paths.append(new_path)
+    if len(paths) == 0:
+        paths.append(args.path)
+    print(paths)
+
+    # cwd = os.getcwd()
+    # args.output_path = os.path.join(cwd, args.output_path)
+    epes = []
+
+    for path in paths:
+        _id = 0
+        images = glob.glob(os.path.join(path, '*.png')) + \
+                    glob.glob(os.path.join(path, '*.jpg'))
+        
+        images = sorted(images)
+
+        for imfile1, imfile2, imfile3 in zip(images[:-2], images[1:-1], images[2:]):
+
+            image1 = load_image(imfile1, transform)
+            image2 = load_image(imfile2, transform)
+            image3 = load_image(imfile3, transform)
+            # print(torch.max(image1), torch.min(image1))
+            # print(image1.shape)
+
+            padder = InputPadder(image1.shape)
+            image1, image2, image3 = padder.pad(image1, image2, image3)
+
+            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
+            flow_12 = padder.unpad(flow_up[0])
+
+            flow_low, flow_up = model(image2, image3, iters=20, test_mode=True)
+            flow_23 = padder.unpad(flow_up[0])
+
+            flow_low, flow_up = model(image1, image3, iters=20, test_mode=True)
+            flow_13 = padder.unpad(flow_up[0])
+
+
+            composed = compose_flow_batch(torch.unsqueeze(flow_12, dim=0), torch.unsqueeze(flow_23, dim=0))[0]
+            viz(args, image1.detach(), image3.detach(), flow_13.detach(), composed.detach(), folder_name, str(_id))
+            exit()
+
+
+            
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="restore checkpoint")
@@ -216,4 +284,5 @@ if __name__ == '__main__':
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50) 
     args = parser.parse_args()
 
-    demo(args)
+    # demo(args)
+    compose(args)
