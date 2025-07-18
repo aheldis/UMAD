@@ -265,7 +265,7 @@ def compose_flow_batch(flow1, flow2):
     )
 
     # --- 6. Add the first flow and the warped second flow ---
-    composed = flow1_tensor + warped_flow2_tensor
+    composed = flow1 + warped_flow2_tensor
     
     return composed
 
