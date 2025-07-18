@@ -257,7 +257,7 @@ def compose_flow_batch(flow1, flow2):
     # --- 5. Warp the second flow field using grid_sample ---
     # grid_sample is designed for batches, so this works directly.
     warped_flow2_tensor = F.grid_sample(
-        flow2_tensor,
+        flow2,
         normalized_sampling_grid,
         mode='bilinear',
         padding_mode='zeros', # Use (0,0) flow for out-of-bounds samples
