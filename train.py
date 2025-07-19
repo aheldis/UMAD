@@ -384,7 +384,7 @@ def train(args):
                 loss, metrics, composed = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
                 if i_batch == 1:
                     viz(image1, image3, composed.detach(), flow_predictions13[-2].detach())
-                    # exit()
+                    exit()
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
                 loss, metrics = sequence_loss(flow_predictions, flow, valid, args.gamma)
