@@ -93,18 +93,18 @@ def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
     flox_rgb.save(output_path + 'image2' + _id + '.png')
 
-def _create_normalized_grid(N: int, H: int, W: int) -> torch.Tensor:
+def _create_normalized_grid(N: int, H: int, W: int, device) -> torch.Tensor:
         """Create a normalized coordinate grid [-1, 1] for grid_sample."""
-        x = torch.linspace(-1, 1, W, device=self.device)
-        y = torch.linspace(-1, 1, H, device=self.device)
+        x = torch.linspace(-1, 1, W, device=device)
+        y = torch.linspace(-1, 1, H, device=device)
         grid_y, grid_x = torch.meshgrid(y, x, indexing='ij')
         grid = torch.stack([grid_x, grid_y], dim=2)  # (H, W, 2)
         return grid.unsqueeze(0).expand(N, -1, -1, -1)  # (N, H, W, 2)
     
-def _create_pixel_grid(N: int, H: int, W: int) -> torch.Tensor:
+def _create_pixel_grid(N: int, H: int, W: int, device) -> torch.Tensor:
         """Create a pixel coordinate grid [0, W-1] x [0, H-1]."""
-        x = torch.arange(W, dtype=torch.float32, device=self.device)
-        y = torch.arange(H, dtype=torch.float32, device=self.device)
+        x = torch.arange(W, dtype=torch.float32, device=device)
+        y = torch.arange(H, dtype=torch.float32, device=device)
         grid_y, grid_x = torch.meshgrid(y, x, indexing='ij')
         grid = torch.stack([grid_x, grid_y], dim=2)  # (H, W, 2)
         return grid.unsqueeze(0).expand(N, -1, -1, -1)  # (N, H, W, 2)
@@ -164,14 +164,14 @@ def compose_flow_batch(flow1, flow2):
 
     # --- 6. Add the first flow and the warped second flow ---
     # composed = flow1 + warped_flow2_tensor
-    grid = _create_normalized_grid(N, H, W)
+    grid = _create_normalized_grid(N, H, W, flow1.device)
         
     # Convert flow1 to sampling grid
     # We need to add flow1 to pixel coordinates, then normalize
     flow1_permuted = flow1.permute(0, 2, 3, 1)  # (N, 2, H, W) -> (N, H, W, 2)
     
     # Create pixel coordinate grid
-    pixel_coords = _create_pixel_grid(N, H, W)
+    pixel_coords = _create_pixel_grid(N, H, W, flow1.device)
     
     # Add flow1 to get new pixel locations
     new_pixel_coords = pixel_coords + flow1_permuted
