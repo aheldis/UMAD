@@ -115,39 +115,65 @@ def compose_flow_batch(flow1, flow2):
 
     N, _, H, W = flow1.shape
 
-    # --- 1. Create a base grid of pixel coordinates ---
-    # This grid represents the original pixel locations 'p'.
-    x_coords = torch.linspace(0, W - 1, W, device=flow1.device)
-    y_coords = torch.linspace(0, H - 1, H, device=flow1.device)
-    grid_y, grid_x = torch.meshgrid(y_coords, x_coords, indexing='ij')
-    base_grid_pixels = torch.stack((grid_x, grid_y), dim=2) # Shape: (H, W, 2)
+    # # --- 1. Create a base grid of pixel coordinates ---
+    # # This grid represents the original pixel locations 'p'.
+    # x_coords = torch.linspace(0, W - 1, W, device=flow1.device)
+    # y_coords = torch.linspace(0, H - 1, H, device=flow1.device)
+    # grid_y, grid_x = torch.meshgrid(y_coords, x_coords, indexing='ij')
+    # base_grid_pixels = torch.stack((grid_x, grid_y), dim=2) # Shape: (H, W, 2)
     
-    # Expand the grid to match the batch size N without copying data.
-    batch_base_grid = base_grid_pixels.unsqueeze(0).expand(N, -1, -1, -1) # Shape: (N, H, W, 2)
+    # # Expand the grid to match the batch size N without copying data.
+    # batch_base_grid = base_grid_pixels.unsqueeze(0).expand(N, -1, -1, -1) # Shape: (N, H, W, 2)
 
-    # --- 2. Calculate target sampling coordinates in pixel space ---
-    # The target coordinates are p' = p + flow1(p).
-    # We need to reshape flow1 to match the grid for addition.
-    flow1_for_grid = flow1.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
-    sampling_grid_pixels = batch_base_grid + flow1_for_grid # Shape: (N, H, W, 2)
+    # # --- 2. Calculate target sampling coordinates in pixel space ---
+    # # The target coordinates are p' = p + flow1(p).
+    # # We need to reshape flow1 to match the grid for addition.
+    # flow1_for_grid = flow1.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
+    # sampling_grid_pixels = batch_base_grid + flow1_for_grid # Shape: (N, H, W, 2)
 
-    # --- 3. Normalize the sampling grid for grid_sample ---
-    # grid_sample requires coordinates in the range [-1, 1].
-    norm_factor = torch.tensor([W - 1, H - 1], dtype=torch.float32, device=flow1.device)
-    normalized_sampling_grid = 2.0 * (sampling_grid_pixels / norm_factor) - 1.0
+    # # --- 3. Normalize the sampling grid for grid_sample ---
+    # # grid_sample requires coordinates in the range [-1, 1].
+    # norm_factor = torch.tensor([W - 1, H - 1], dtype=torch.float32, device=flow1.device)
+    # normalized_sampling_grid = 2.0 * (sampling_grid_pixels / norm_factor) - 1.0
 
     # --- 4. Warp the second flow field using grid_sample ---
-    # grid_sample is designed for batches, so this works directly.
-    warped_flow2_tensor = F.grid_sample(
-        flow2,
-        normalized_sampling_grid,
-        mode='bilinear',
-        padding_mode='zeros', # Use (0,0) flow for out-of-bounds samples
-        align_corners=True
-    )
+    # # grid_sample is designed for batches, so this works directly.
+    # warped_flow2_tensor = F.grid_sample(
+    #     flow2,
+    #     normalized_sampling_grid,
+    #     mode='bilinear',
+    #     padding_mode='zeros', # Use (0,0) flow for out-of-bounds samples
+    #     align_corners=True
+    # )
 
     # --- 6. Add the first flow and the warped second flow ---
-    composed = flow1 + warped_flow2_tensor
+    # composed = flow1 + warped_flow2_tensor
+    grid = self._create_normalized_grid(N, H, W)
+        
+    # Convert flow1 to sampling grid
+    # We need to add flow1 to pixel coordinates, then normalize
+    flow1_permuted = flow1.permute(0, 2, 3, 1)  # (N, 2, H, W) -> (N, H, W, 2)
+    
+    # Create pixel coordinate grid
+    pixel_coords = self._create_pixel_grid(N, H, W)
+    
+    # Add flow1 to get new pixel locations
+    new_pixel_coords = pixel_coords + flow1_permuted
+    
+    # Normalize to [-1, 1] for grid_sample
+    new_pixel_coords[..., 0] = 2.0 * new_pixel_coords[..., 0] / (W - 1) - 1.0
+    new_pixel_coords[..., 1] = 2.0 * new_pixel_coords[..., 1] / (H - 1) - 1.0
+
+    warped_flow2 = F.grid_sample(
+            flow2, 
+            new_pixel_coords,
+            mode='bilinear',
+            padding_mode='zeros',
+            align_corners=True
+        )
+        
+    composed = flow1 + warped_flow2
+
     
     return composed
 
