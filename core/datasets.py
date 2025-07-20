@@ -113,7 +113,7 @@ class FlowDataset(data.Dataset):
         else:
             return img1, img2
 
-        print("dataset:", self.extra_info[index])
+        # print("dataset:", self.extra_info[index])
         return img1, img2, img3, flow1, flow2, valid.float()
 
 

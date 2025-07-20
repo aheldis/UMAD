@@ -55,10 +55,12 @@ print(class_boundary)
 
 
 
-def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
+def viz(img1, img2, img3, flo, gt_flo, path = '', _id = '1'):
     print(img1[0].shape, img2[0].shape, flo[0].shape, gt_flo[0].shape)
     img = img1[0].permute(1,2,0).cpu().numpy()
     img2 = img2[0].permute(1,2,0).cpu().numpy()
+    img3 = img3[0].permute(1,2,0).cpu().numpy()
+
     gt_flo = gt_flo[0].permute(1,2,0).cpu().numpy()
     flo = flo[0].permute(1,2,0).cpu().numpy()
 
@@ -92,6 +94,8 @@ def viz(img1, img2, flo, gt_flo, path = '', _id = '1'):
     flox_rgb.save(output_path + 'image1' + _id + '.png')
     flox_rgb = Image.fromarray(img2.astype('uint8'), 'RGB')
     flox_rgb.save(output_path + 'image2' + _id + '.png')
+    lox_rgb = Image.fromarray(img3.astype('uint8'), 'RGB')
+    flox_rgb.save(output_path + 'image3' + _id + '.png')
 
 def _create_normalized_grid(N: int, H: int, W: int, device) -> torch.Tensor:
         """Create a normalized coordinate grid [-1, 1] for grid_sample."""
@@ -399,7 +403,7 @@ def train(args):
                 flow_predictions13 = model(image1, image3, iters=args.iters)  
                 loss, metrics, composed = composition_loss(flow_predictions12, flow_predictions23, flow_predictions13, args.gamma)
                 if i_batch == 1:
-                    viz(image1, image3, composed.detach(), flow_predictions13[-2].detach())
+                    viz(image1, image2, image3, composed.detach(), flow_predictions13[-2].detach())
                     exit()
             else:
                 flow_predictions = model(image1, image2, iters=args.iters)            
