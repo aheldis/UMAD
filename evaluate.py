@@ -291,6 +291,7 @@ def validate_kitti(model, iters=24):
     print("Validation KITTI: %f, %f" % (epe, f1))
     return {'kitti-epe': epe, 'kitti-f1': f1}
 
+
 @torch.no_grad()
 def validate_jhmdb(model, iters=24):
     """Perform evaluation on JHMDB using FlowBrox04 as flow 'GT' (if available)."""
@@ -326,7 +327,7 @@ def validate_jhmdb(model, iters=24):
         image1, image2, flow_gt, valid_gt = sample
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
-        print(image1.shape)
+        # print(image1.shape)
 
         padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
