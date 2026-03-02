@@ -244,6 +244,166 @@ class nuScenes(FlowDataset):
             self.extra_info += [[frame_id]]
 
 
+# -----------------------------
+# Add this class alongside the other datasets (e.g., after HD1K / before nuScenes)
+# -----------------------------
+class JHMDB(FlowDataset):
+    """
+    JHMDB loader for your folder layout:
+
+      root/
+        Frames/<action>/<video>/*.png
+        FlowBrox04/<action>/<video>/*.jpg   (optional "flow", commonly encoded)
+
+    If you DON'T want to use Brox flow as supervision, set use_flow=False and the dataset
+    will return (img1, img2) like other flow-less datasets.
+
+    If you DO want to use Brox flow, set use_flow=True. For .jpg flows, we assume a common
+    encoding: u in R channel, v in G channel, decoded as (val - 128) / flow_img_scale.
+    If your encoding differs, adjust `_read_flow_rg_jpg()`.
+    """
+    def __init__(
+        self,
+        aug_params=None,
+        root="../JHMDB",
+        use_flow=False,
+        frame_ext="png",
+        flow_ext="jpg",
+        flow_mode="auto",         # "auto" or "rg_jpg" or "none"
+        flow_img_scale=20.0       # decode scale for jpg flow
+    ):
+        super(JHMDB, self).__init__(aug_params, sparse=False)
+
+        self.use_flow = use_flow
+        self.flow_mode = flow_mode
+        self.flow_img_scale = float(flow_img_scale)
+
+        frames_root = osp.join(root, "Frames")
+        flow_root   = osp.join(root, "FlowBrox04")
+
+        if not osp.isdir(frames_root):
+            raise FileNotFoundError(f"JHMDB Frames not found: {frames_root}")
+
+        actions = sorted([d for d in os.listdir(frames_root) if osp.isdir(osp.join(frames_root, d))])
+
+        for action in actions:
+            action_dir = osp.join(frames_root, action)
+            videos = sorted([d for d in os.listdir(action_dir) if osp.isdir(osp.join(action_dir, d))])
+
+            for vid in videos:
+                vid_dir = osp.join(action_dir, vid)
+                frames = sorted(glob(osp.join(vid_dir, f"*.{frame_ext}")))
+                if len(frames) < 2:
+                    continue
+
+                flow_vid_dir = osp.join(flow_root, action, vid)
+
+                for i in range(len(frames) - 1):
+                    img1_path, img2_path = frames[i], frames[i + 1]
+                    stem = osp.splitext(osp.basename(img1_path))[0]  # e.g., "00001"
+
+                    # If using flow supervision, only keep pairs where the flow exists
+                    if self.use_flow:
+                        flow_path = osp.join(flow_vid_dir, f"{stem}.{flow_ext}")
+                        if not osp.isfile(flow_path):
+                            # skip if flow file missing
+                            continue
+                        self.flow_list.append(flow_path)
+
+                    self.image_list.append([img1_path, img2_path])
+                    self.extra_info.append((action, vid, i))
+
+    def _read_flow_rg_jpg(self, flow_path: str) -> np.ndarray:
+        """Decode flow from a single JPG: u=R, v=G, flow=(val-128)/scale."""
+        flow_img = frame_utils.read_gen(flow_path)
+        flow_img = np.array(flow_img).astype(np.float32)
+
+        if flow_img.ndim == 2:
+            # grayscale: can't reliably recover (u,v); raise to avoid silent bugs
+            raise ValueError(f"Expected RGB flow jpg but got grayscale: {flow_path}")
+
+        # Use R,G channels as (u,v)
+        u = flow_img[..., 0]
+        v = flow_img[..., 1]
+        u = (u - 128.0) / self.flow_img_scale
+        v = (v - 128.0) / self.flow_img_scale
+        return np.stack([u, v], axis=-1).astype(np.float32)
+
+    def __getitem__(self, index):
+        # copy FlowDataset logic but with custom flow decoding for JHMDB jpgs
+        if self.is_test:
+            img1 = frame_utils.read_gen(self.image_list[index][0])
+            img2 = frame_utils.read_gen(self.image_list[index][1])
+            img1 = np.array(img1).astype(np.uint8)[..., :3]
+            img2 = np.array(img2).astype(np.uint8)[..., :3]
+            img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
+            img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+            return img1, img2, self.extra_info[index]
+
+        if not self.init_seed:
+            worker_info = torch.utils.data.get_worker_info()
+            if worker_info is not None:
+                torch.manual_seed(worker_info.id)
+                np.random.seed(worker_info.id)
+                random.seed(worker_info.id)
+                self.init_seed = True
+
+        index = index % len(self.image_list)
+        valid = None
+        flow = None
+
+        # --- flow ---
+        if self.use_flow and len(self.flow_list) != 0:
+            flow_path = self.flow_list[index]
+
+            if self.flow_mode == "none":
+                flow = None
+            elif self.flow_mode == "rg_jpg":
+                flow = self._read_flow_rg_jpg(flow_path)
+            else:
+                # auto: if jpg -> rg_jpg decode, else try frame_utils.read_gen
+                if str(flow_path).lower().endswith((".jpg", ".jpeg")):
+                    flow = self._read_flow_rg_jpg(flow_path)
+                else:
+                    flow = frame_utils.read_gen(flow_path)
+                    flow = np.array(flow).astype(np.float32)
+
+        # --- images ---
+        img1 = frame_utils.read_gen(self.image_list[index][0])
+        img2 = frame_utils.read_gen(self.image_list[index][1])
+
+        img1 = np.array(img1).astype(np.uint8)
+        img2 = np.array(img2).astype(np.uint8)
+
+        # grayscale -> 3ch
+        if len(img1.shape) == 2:
+            img1 = np.tile(img1[..., None], (1, 1, 3))
+            img2 = np.tile(img2[..., None], (1, 1, 3))
+        else:
+            img1 = img1[..., :3]
+            img2 = img2[..., :3]
+
+        # --- augment ---
+        if self.augmentor is not None:
+            # your FlowAugmentor expects flow (can be None only if it supports it)
+            if flow is None:
+                # If you want to train without flow, keep use_flow=False so FlowDataset returns (img1,img2)
+                img1, img2, flow = self.augmentor(img1, img2, flow)
+            else:
+                img1, img2, flow = self.augmentor(img1, img2, flow)
+
+        # --- to torch ---
+        img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
+        img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+
+        if flow is None:
+            return img1, img2
+
+        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+        valid = (flow[0].abs() < 1000) & (flow[1].abs() < 1000)
+        return img1, img2, flow, valid.float()
+
+
 
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
     """ Create the data loader for the corresponding trainign set """
@@ -275,6 +435,18 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
     elif args.stage == 'kitti':
         aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.4, 'do_flip': False}
         train_dataset = KITTI(aug_params, split='training')
+
+    elif args.stage == 'jhmdb':
+        aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.6, 'do_flip': True}
+        train_dataset = JHMDB(
+            aug_params=aug_params,
+            root=getattr(args, "jhmdb_root", "../JHMDB"),
+            use_flow=getattr(args, "jhmdb_use_flow", False),      # set True if you want to use FlowBrox04 as flow GT
+            flow_mode=getattr(args, "jhmdb_flow_mode", "auto"),   # "auto" or "rg_jpg"
+            flow_img_scale=getattr(args, "jhmdb_flow_scale", 20.0),
+            frame_ext=getattr(args, "jhmdb_frame_ext", "png"),
+            flow_ext=getattr(args, "jhmdb_flow_ext", "jpg"),
+        )
 
 
     torch.backends.cudnn.deterministic = True

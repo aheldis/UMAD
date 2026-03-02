@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 import core.datasets as datasets
 from utils import flow_viz
@@ -291,6 +291,75 @@ def validate_kitti(model, iters=24):
     print("Validation KITTI: %f, %f" % (epe, f1))
     return {'kitti-epe': epe, 'kitti-f1': f1}
 
+@torch.no_grad()
+def validate_jhmdb(model, iters=24):
+    """Perform evaluation on JHMDB using FlowBrox04 as flow 'GT' (if available)."""
+    model.eval()
+    results = {}
+
+    # IMPORTANT:
+    # This assumes you added datasets.JHMDB(...) in core/datasets.py, and that it returns
+    # (img1, img2, flow_gt, valid) when use_flow=True.
+    val_dataset = datasets.JHMDB(
+        aug_params=None,
+        root=args.jhmdb_root,
+        use_flow=True,
+        flow_mode=args.jhmdb_flow_mode,
+        flow_img_scale=args.jhmdb_flow_scale,
+        frame_ext=args.jhmdb_frame_ext,
+        flow_ext=args.jhmdb_flow_ext,
+    )
+
+    epe_list = []
+    epe_all_list = []
+
+    for val_id in range(len(val_dataset)):
+        sample = val_dataset[val_id]
+
+        if len(sample) == 2:
+            # No GT flow available
+            raise RuntimeError(
+                "JHMDB dataset returned only (img1, img2). "
+                "Set use_flow=True in datasets.JHMDB and ensure FlowBrox04 is present."
+            )
+
+        image1, image2, flow_gt, valid_gt = sample
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+        print(image1.shape)
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        flow_low, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+
+        flow = padder.unpad(flow_pr[0]).cpu()  # 2xHxW
+
+        # EPE (mask valid pixels if available)
+        epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()  # HxW
+        if valid_gt is not None:
+            m = valid_gt >= 0.5
+            epe_valid = epe[m]
+        else:
+            epe_valid = epe.view(-1)
+
+        epe_list.append(epe_valid.mean().item())
+        epe_all_list.append(epe_valid.view(-1).numpy())
+
+    epe_all = np.concatenate(epe_all_list)
+    epe_mean = float(np.mean(epe_all))
+    px1 = float(np.mean(epe_all < 1))
+    px3 = float(np.mean(epe_all < 3))
+    px5 = float(np.mean(epe_all < 5))
+
+    print("Validation JHMDB EPE: %f, 1px: %f, 3px: %f, 5px: %f" % (epe_mean, px1, px3, px5))
+    results["jhmdb-epe"] = epe_mean
+    results["jhmdb-1px"] = px1
+    results["jhmdb-3px"] = px3
+    results["jhmdb-5px"] = px5
+    return results
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -300,7 +369,7 @@ if __name__ == '__main__':
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
-    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='PGD')
+    parser.add_argument('--attack_type', help='Attack type options: None, FGSM, PGD', type=str, default='None')
     parser.add_argument('--iters', help='Number of iters for PGD?', type=int, default=50)
     parser.add_argument('--epsilon', help='epsilon?', type=int, default=10.0)
     parser.add_argument('--channel', help='Color channel options: 0, 1, 2, -1 (all)', type=int, default=-1)    
@@ -310,6 +379,12 @@ if __name__ == '__main__':
     parser.add_argument('--output_path', help="output viz")
     parser.add_argument('--name', help="output viz", default="flow.png")
     parser.add_argument('--partition', type=str, default="front")
+    parser.add_argument('--jhmdb_root', type=str, default='/data/JHMDB')
+    parser.add_argument('--jhmdb_flow_mode', type=str, default='auto')   # e.g., 'auto' or 'rg_jpg'
+    parser.add_argument('--jhmdb_flow_scale', type=float, default=20.0)
+    parser.add_argument('--jhmdb_frame_ext', type=str, default='png')
+    parser.add_argument('--jhmdb_flow_ext', type=str, default='jpg')
+
 
 
     args = parser.parse_args()
@@ -340,5 +415,8 @@ if __name__ == '__main__':
 
         elif args.dataset == "nuscenes":
             create_nuscenes_submission(model.module, partition=args.partition)
+
+        elif args.dataset == "jhmdb":
+            validate_jhmdb(model.module)
 
 
