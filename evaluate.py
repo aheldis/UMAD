@@ -504,4 +504,7 @@ if __name__ == '__main__':
         elif args.dataset == "jhmdb":
             validate_jhmdb(model.module)
 
+        elif args.dataset in ["vkitti2", "vkitti"]:
+            validate_vkitti2(model.module)
+
 
