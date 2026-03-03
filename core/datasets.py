@@ -404,6 +404,70 @@ class JHMDB(FlowDataset):
         return img1, img2, flow, valid.float()
 
 
+class VirtualKITTI2(FlowDataset):
+    def __init__(
+        self,
+        aug_params=None,
+        root="../VKITTI2",
+        scenes=("Scene01", "Scene02", "Scene06", "Scene18", "Scene20"),
+        camera="Camera_0",
+        include_forward=True,
+        include_backward=True,
+        variations=None,   # None => all subfolders under each scene
+    ):
+        super(VirtualKITTI2, self).__init__(aug_params, sparse=True)
+        self.vkitti2 = True  # <<< tells FlowDataset to use read_vkitti2_flow
+
+        # auto-handle extracted folder nesting: root/<vkitti_2.*>/Scene01/...
+        base = root
+        if not osp.isdir(osp.join(base, scenes[0])) and osp.isdir(base):
+            for d in sorted(os.listdir(base)):
+                cand = osp.join(base, d)
+                if osp.isdir(cand) and osp.isdir(osp.join(cand, scenes[0])):
+                    base = cand
+                    break
+
+        for scene in scenes:
+            scene_dir = osp.join(base, scene)
+            if not osp.isdir(scene_dir):
+                continue
+
+            if variations is None:
+                types = sorted([d for d in os.listdir(scene_dir) if osp.isdir(osp.join(scene_dir, d))])
+            else:
+                types = list(variations)
+
+            for v in types:
+                type_dir = osp.join(scene_dir, v)
+                if not osp.isdir(type_dir):
+                    continue
+
+                # rgb can be jpg (official), but keep jpg/png robust
+                imgs = sorted(glob(osp.join(type_dir, "frames", "rgb", camera, "*.jpg")))
+                if len(imgs) == 0:
+                    imgs = sorted(glob(osp.join(type_dir, "frames", "rgb", camera, "*.png")))
+
+                flows_fwd = sorted(glob(osp.join(type_dir, "frames", "forwardFlow", camera, "*.png")))
+                flows_bwd = sorted(glob(osp.join(type_dir, "frames", "backwardFlow", camera, "*.png")))
+
+                if len(imgs) < 2:
+                    continue
+
+                # forward: (t -> t+1)
+                if include_forward and len(flows_fwd) == len(imgs) - 1:
+                    for i in range(len(imgs) - 1):
+                        self.image_list += [[imgs[i], imgs[i + 1]]]
+                        self.flow_list += [flows_fwd[i]]
+                        self.extra_info += [(scene, v, camera, "fwd", i)]
+
+                # backward: (t+1 -> t)
+                if include_backward and len(flows_bwd) == len(imgs) - 1:
+                    for i in range(len(imgs) - 1):
+                        self.image_list += [[imgs[i + 1], imgs[i]]]
+                        self.flow_list += [flows_bwd[i]]
+                        self.extra_info += [(scene, v, camera, "bwd", i)]
+
+
 
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
     """ Create the data loader for the corresponding trainign set """
@@ -446,6 +510,17 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
             flow_img_scale=getattr(args, "jhmdb_flow_scale", 20.0),
             frame_ext=getattr(args, "jhmdb_frame_ext", "png"),
             flow_ext=getattr(args, "jhmdb_flow_ext", "jpg"),
+        )
+
+    elif args.stage in ('vkitti2', 'vkitti'):
+        aug_params = {'crop_size': args.image_size, 'min_scale': -0.3, 'max_scale': 0.5, 'do_flip': True}
+        train_dataset = VirtualKITTI2(
+            aug_params=aug_params,
+            root=getattr(args, "vkitti2_root", "../VKITTI2"),
+            camera=getattr(args, "vkitti2_camera", "Camera_0"),
+            include_forward=True,
+            include_backward=True,
+            variations=getattr(args, "vkitti2_variations", None),  # None => all
         )
 
 

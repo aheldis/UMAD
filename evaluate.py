@@ -361,6 +361,84 @@ def validate_jhmdb(model, iters=24):
     return results
 
 
+@torch.no_grad()
+def validate_vkitti2(model, iters=24):
+    """Evaluate Virtual KITTI 2 (dense flow) with EPE + {1,3,5}px metrics."""
+    model.eval()
+    results = {}
+
+    # Parse optional CLI filters (safe defaults)
+    scenes = None
+    if hasattr(args, "vkitti2_scenes") and args.vkitti2_scenes:
+        scenes = tuple([s.strip() for s in args.vkitti2_scenes.split(",") if s.strip()])
+
+    variations = None
+    if hasattr(args, "vkitti2_variations") and args.vkitti2_variations:
+        variations = [s.strip() for s in args.vkitti2_variations.split(",") if s.strip()]
+
+    camera = getattr(args, "vkitti2_camera", "Camera_0")
+    root = getattr(args, "vkitti2_root", "../VKITTI2")
+    include_forward = getattr(args, "vkitti2_forward", True)
+    include_backward = getattr(args, "vkitti2_backward", True)
+
+    # This assumes you added datasets.VirtualKITTI2 in core/datasets.py
+    # and it returns (img1, img2, flow_gt, valid_gt)
+    if scenes is None:
+        val_dataset = datasets.VirtualKITTI2(
+            aug_params=None, root=root, camera=camera,
+            include_forward=include_forward, include_backward=include_backward,
+            variations=variations
+        )
+    else:
+        val_dataset = datasets.VirtualKITTI2(
+            aug_params=None, root=root, scenes=scenes, camera=camera,
+            include_forward=include_forward, include_backward=include_backward,
+            variations=variations
+        )
+
+    print("VKITTI2 pairs =", len(val_dataset))
+
+    max_n = len(val_dataset)
+    if hasattr(args, "max_samples") and args.max_samples is not None and args.max_samples > 0:
+        max_n = min(max_n, args.max_samples)
+
+    epe_all_list = []
+
+    for val_id in range(max_n):
+        image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow = padder.unpad(flow_pr[0]).cpu()  # 2xHxW
+
+        epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()  # HxW
+        if valid_gt is not None:
+            m = valid_gt >= 0.5
+            epe_valid = epe[m]
+        else:
+            epe_valid = epe.view(-1)
+
+        epe_all_list.append(epe_valid.view(-1).numpy())
+
+    epe_all = np.concatenate(epe_all_list)
+    epe_mean = float(np.mean(epe_all))
+    px1 = float(np.mean(epe_all < 1))
+    px3 = float(np.mean(epe_all < 3))
+    px5 = float(np.mean(epe_all < 5))
+
+    print("Validation VKITTI2 EPE: %f, 1px: %f, 3px: %f, 5px: %f" % (epe_mean, px1, px3, px5))
+    results["vkitti2-epe"] = epe_mean
+    results["vkitti2-1px"] = px1
+    results["vkitti2-3px"] = px3
+    results["vkitti2-5px"] = px5
+    return results
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -380,12 +458,18 @@ if __name__ == '__main__':
     parser.add_argument('--output_path', help="output viz")
     parser.add_argument('--name', help="output viz", default="flow.png")
     parser.add_argument('--partition', type=str, default="front")
-    parser.add_argument('--jhmdb_root', type=str, default='/data/JHMDB')
+    parser.add_argument('--jhmdb_root', type=str, default='../JHMDB')
     parser.add_argument('--jhmdb_flow_mode', type=str, default='auto')   # e.g., 'auto' or 'rg_jpg'
     parser.add_argument('--jhmdb_flow_scale', type=float, default=20.0)
     parser.add_argument('--jhmdb_frame_ext', type=str, default='png')
     parser.add_argument('--jhmdb_flow_ext', type=str, default='jpg')
-
+    # VKITTI2
+    parser.add_argument('--vkitti2_root', type=str, default='../VKITTI2')
+    parser.add_argument('--vkitti2_camera', type=str, default='Camera_0')
+    parser.add_argument('--vkitti2_scenes', type=str, default='')          # e.g. "Scene01,Scene02"
+    parser.add_argument('--vkitti2_variations', type=str, default='')      # e.g. "clone,fog,rain"
+    parser.add_argument('--vkitti2_forward', type=bool, default=True)
+    parser.add_argument('--vkitti2_backward', type=bool, default=True)
 
 
     args = parser.parse_args()
