@@ -191,11 +191,12 @@ def create_nuscenes_submission(model, iters=24, partition='front', output_path='
 # (I’m not rewriting them to keep this focused on JHMDB + HD1K corruptions.)
 # -------------------------
 
-@torch.no_grad()
+import time
+
+@torch.inference_mode()
 def validate_jhmdb(model, iters=24):
     """JHMDB evaluation with optional corruptions (gaussian/colorjitter/blur)."""
     model.eval()
-    results = {}
 
     val_dataset = datasets.JHMDB(
         aug_params=None,
@@ -207,104 +208,120 @@ def validate_jhmdb(model, iters=24):
         flow_ext=args.jhmdb_flow_ext,
     )
 
-    print("JHMDB pairs =", len(val_dataset))
-
     max_n = len(val_dataset) if args.max_samples < 0 else min(len(val_dataset), args.max_samples)
+    tag = args.corruptions if args.corruptions else "none"
+    print(f"JHMDB pairs = {len(val_dataset)} | eval = {max_n} | corruptions = {tag}", flush=True)
 
-    epe_all_list = []
+    total_epe = 0.0
+    total_px = 0
+    cnt1 = cnt3 = cnt5 = 0
 
+    t0 = time.time()
     for val_id in range(max_n):
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
 
-        image1 = image1[None].cuda()
-        image2 = image2[None].cuda()
+        image1 = image1[None].cuda(non_blocking=True)
+        image2 = image2[None].cuda(non_blocking=True)
+        flow_gt = flow_gt.cuda(non_blocking=True)
+        if valid_gt is not None:
+            valid_gt = (valid_gt.cuda(non_blocking=True) >= 0.5)
 
-        # apply corruptions BEFORE padding
+        # corrupt before padding
         image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
 
         padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
 
         _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        flow = padder.unpad(flow_pr[0]).cpu()  # 2xHxW
+        flow = padder.unpad(flow_pr[0])  # stays on GPU: [2,H,W]
 
-        epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()  # HxW
+        epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))  # [H,W]
         if valid_gt is not None:
-            m = valid_gt >= 0.5
-            epe_valid = epe[m]
+            epe = epe[valid_gt]
         else:
-            epe_valid = epe.view(-1)
+            epe = epe.view(-1)
 
-        epe_all_list.append(epe_valid.view(-1).numpy())
+        total_epe += epe.sum().item()
+        total_px += epe.numel()
+        cnt1 += (epe < 1).sum().item()
+        cnt3 += (epe < 3).sum().item()
+        cnt5 += (epe < 5).sum().item()
 
-    epe_all = np.concatenate(epe_all_list)
-    epe_mean = float(np.mean(epe_all))
-    px1 = float(np.mean(epe_all < 1))
-    px3 = float(np.mean(epe_all < 3))
-    px5 = float(np.mean(epe_all < 5))
+        if val_id > 0 and (val_id % args.print_freq == 0):
+            elapsed = time.time() - t0
+            sp = elapsed / val_id
+            eta = sp * (max_n - val_id)
+            cur_epe = total_epe / max(total_px, 1)
+            print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
 
-    tag = args.corruptions if args.corruptions else "none"
-    print(f"[JHMDB | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}")
+    epe_mean = total_epe / max(total_px, 1)
+    px1 = cnt1 / max(total_px, 1)
+    px3 = cnt3 / max(total_px, 1)
+    px5 = cnt5 / max(total_px, 1)
 
-    results["jhmdb-epe"] = epe_mean
-    results["jhmdb-1px"] = px1
-    results["jhmdb-3px"] = px3
-    results["jhmdb-5px"] = px5
-    return results
+    print(f"[JHMDB | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
+    return {"jhmdb-epe": epe_mean, "jhmdb-1px": px1, "jhmdb-3px": px3, "jhmdb-5px": px5}
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def validate_hd1k(model, iters=24):
     """HD1K evaluation with optional corruptions (gaussian/colorjitter/blur)."""
     model.eval()
-    results = {}
 
-    # HD1K is sparse=True in your datasets.py, returns (img1,img2,flow,valid)
     val_dataset = datasets.HD1K(aug_params=None, root=args.hd1k_root)
 
-    print("HD1K pairs =", len(val_dataset))
-
     max_n = len(val_dataset) if args.max_samples < 0 else min(len(val_dataset), args.max_samples)
+    tag = args.corruptions if args.corruptions else "none"
+    print(f"HD1K pairs = {len(val_dataset)} | eval = {max_n} | corruptions = {tag}", flush=True)
 
-    epe_all_list = []
+    total_epe = 0.0
+    total_px = 0
+    cnt1 = cnt3 = cnt5 = 0
 
+    t0 = time.time()
     for val_id in range(max_n):
         image1, image2, flow_gt, valid_gt = val_dataset[val_id]
-        image1 = image1[None].cuda()
-        image2 = image2[None].cuda()
 
-        # apply corruptions BEFORE padding
+        image1 = image1[None].cuda(non_blocking=True)
+        image2 = image2[None].cuda(non_blocking=True)
+        flow_gt = flow_gt.cuda(non_blocking=True)
+        if valid_gt is not None:
+            valid_gt = (valid_gt.cuda(non_blocking=True) >= 0.5)
+
         image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
 
-        padder = InputPadder(image1.shape)  # default works fine
+        padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
 
         _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        flow = padder.unpad(flow_pr[0]).cpu()  # 2xHxW
+        flow = padder.unpad(flow_pr[0])  # GPU
 
-        epe = torch.sum((flow - flow_gt)**2, dim=0).sqrt()  # HxW
+        epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))
         if valid_gt is not None:
-            m = valid_gt >= 0.5
-            epe_valid = epe[m]
+            epe = epe[valid_gt]
         else:
-            epe_valid = epe.view(-1)
+            epe = epe.view(-1)
 
-        epe_all_list.append(epe_valid.view(-1).numpy())
+        total_epe += epe.sum().item()
+        total_px += epe.numel()
+        cnt1 += (epe < 1).sum().item()
+        cnt3 += (epe < 3).sum().item()
+        cnt5 += (epe < 5).sum().item()
 
-    epe_all = np.concatenate(epe_all_list)
-    epe_mean = float(np.mean(epe_all))
-    px1 = float(np.mean(epe_all < 1))
-    px3 = float(np.mean(epe_all < 3))
-    px5 = float(np.mean(epe_all < 5))
+        if val_id > 0 and (val_id % args.print_freq == 0):
+            elapsed = time.time() - t0
+            sp = elapsed / val_id
+            eta = sp * (max_n - val_id)
+            cur_epe = total_epe / max(total_px, 1)
+            print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
 
-    tag = args.corruptions if args.corruptions else "none"
-    print(f"[HD1K | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}")
+    epe_mean = total_epe / max(total_px, 1)
+    px1 = cnt1 / max(total_px, 1)
+    px3 = cnt3 / max(total_px, 1)
+    px5 = cnt5 / max(total_px, 1)
 
-    results["hd1k-epe"] = epe_mean
-    results["hd1k-1px"] = px1
-    results["hd1k-3px"] = px3
-    results["hd1k-5px"] = px5
-    return results
+    print(f"[HD1K | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
+    return {"hd1k-epe": epe_mean, "hd1k-1px": px1, "hd1k-3px": px3, "hd1k-5px": px5}
 
 
 if __name__ == '__main__':
@@ -362,6 +379,8 @@ if __name__ == '__main__':
     # Blur
     parser.add_argument('--blur_ksize', type=int, default=11)
     parser.add_argument('--blur_sigma', type=float, default=2.0)
+
+    parser.add_argument('--print_freq', type=int, default=500)
 
     args = parser.parse_args()
 
