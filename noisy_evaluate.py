@@ -524,7 +524,7 @@ def validate_middlebury(model, iters=12):
         image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
 
         # optional resize (also rescales flow + mask)
-        image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(image1, image2, flow_gt, valid_gt, args.max_side)
+        # image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(image1, image2, flow_gt, valid_gt, args.max_side)
 
         padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
