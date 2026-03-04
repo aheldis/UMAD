@@ -818,15 +818,15 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
         )
 
     elif args.stage in ('tartanair', 'tartan'):
-    aug_params = {'crop_size': args.image_size, 'min_scale': -0.3, 'max_scale': 0.5, 'do_flip': True}
-    train_dataset = TartanAir(
-        aug_params=aug_params,
-        root=getattr(args, "tartanair_root", "../tartanair"),
-        difficulties=getattr(args, "tartanair_difficulties", ("Easy", "Hard")),
-        envs=getattr(args, "tartanair_envs", None),
-        trajectories=getattr(args, "tartanair_trajectories", None),
-        use_mask=getattr(args, "tartanair_use_mask", True),
-    )
+        aug_params = {'crop_size': args.image_size, 'min_scale': -0.3, 'max_scale': 0.5, 'do_flip': True}
+        train_dataset = TartanAir(
+            aug_params=aug_params,
+            root=getattr(args, "tartanair_root", "../tartanair"),
+            difficulties=getattr(args, "tartanair_difficulties", ("Easy", "Hard")),
+            envs=getattr(args, "tartanair_envs", None),
+            trajectories=getattr(args, "tartanair_trajectories", None),
+            use_mask=getattr(args, "tartanair_use_mask", True),
+        )
 
 
     torch.backends.cudnn.deterministic = True
