@@ -252,7 +252,7 @@ def validate_jhmdb(model, iters=24):
             sp = elapsed / val_id
             eta = sp * (max_n - val_id)
             cur_epe = total_epe / max(total_px, 1)
-            print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
+            # print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
 
     epe_mean = total_epe / max(total_px, 1)
     px1 = cnt1 / max(total_px, 1)
@@ -313,7 +313,7 @@ def validate_hd1k(model, iters=24):
             sp = elapsed / val_id
             eta = sp * (max_n - val_id)
             cur_epe = total_epe / max(total_px, 1)
-            print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
+            # print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
 
     epe_mean = total_epe / max(total_px, 1)
     px1 = cnt1 / max(total_px, 1)
