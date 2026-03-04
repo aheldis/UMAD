@@ -358,6 +358,7 @@ if __name__ == '__main__':
 
     # HD1K root
     parser.add_argument('--hd1k_root', type=str, default='../HD1k')
+    parser.add_argument('--image_size', type=int)
 
     # Speed control
     parser.add_argument('--max_samples', type=int, default=-1, help='cap #pairs for fast eval')
