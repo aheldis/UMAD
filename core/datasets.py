@@ -468,6 +468,93 @@ class VirtualKITTI2(FlowDataset):
                         self.extra_info += [(scene, v, camera, "bwd", i)]
 
 
+class Middlebury(FlowDataset):
+    """
+    Middlebury Optical Flow loader (classic benchmark format).
+
+    Expected (common) files per sequence:
+      - frame10.(png|ppm|jpg)
+      - frame11.(png|ppm|jpg)
+      - flow10.flo   (if GT is available)
+
+    This implementation is robust to different unzip layouts:
+      It recursively searches under `root` for directories containing frame10+frame11,
+      and tries to find a matching flow10.flo either in the same directory or in a
+      separate GT directory with the same sequence name.
+
+    split:
+      - 'other'  : public GT (requires flow10.flo unless strict=False)
+      - 'eval'   : hidden GT (test-only) -> returns (img1, img2, extra_info)
+    """
+    def __init__(self, aug_params=None, root="../middlebury", split="other", strict=True):
+        super(Middlebury, self).__init__(aug_params, sparse=False)
+
+        split = split.lower()
+        if split in ("eval", "test", "evaluation"):
+            self.is_test = True
+
+        # 1) Find all sequences that contain frame10 + frame11
+        img_exts = ("png", "ppm", "jpg", "jpeg", "bmp")
+        frame10_files = []
+        for ext in img_exts:
+            frame10_files += glob(osp.join(root, "**", f"frame10.{ext}"), recursive=True)
+
+        # 2) Index all flow10.flo by sequence folder name (last dir)
+        flow10_files = glob(osp.join(root, "**", "flow10.flo"), recursive=True)
+        flow_by_seq = {}
+        for f in flow10_files:
+            seq = osp.basename(osp.dirname(f))
+            # keep first; if duplicates exist, you can change this to prefer a GT folder
+            flow_by_seq.setdefault(seq, f)
+
+        def _find_pair(dirpath):
+            f10 = None
+            f11 = None
+            for ext in img_exts:
+                p10 = osp.join(dirpath, f"frame10.{ext}")
+                p11 = osp.join(dirpath, f"frame11.{ext}")
+                if osp.isfile(p10) and osp.isfile(p11):
+                    return p10, p11
+            return None, None
+
+        seq_dirs = set(osp.dirname(p) for p in frame10_files)
+
+        for d in sorted(seq_dirs):
+            f10, f11 = _find_pair(d)
+            if f10 is None:
+                continue
+
+            seq = osp.basename(d)
+            flow_path = osp.join(d, "flow10.flo")
+            if not osp.isfile(flow_path):
+                flow_path = flow_by_seq.get(seq, None)
+
+            if not self.is_test:
+                if flow_path is None:
+                    if strict:
+                        # skip sequences without GT (or raise)
+                        continue
+                    else:
+                        flow_path = None
+
+                if flow_path is not None:
+                    self.flow_list.append(flow_path)
+
+            self.image_list.append([f10, f11])
+            self.extra_info.append((seq, 10))
+
+        if len(self.image_list) == 0:
+            raise FileNotFoundError(
+                f"Middlebury: no sequences found under root={root}. "
+                f"Expected folders containing frame10/frame11."
+            )
+
+        if (not self.is_test) and strict and (len(self.flow_list) == 0):
+            raise FileNotFoundError(
+                f"Middlebury: found image pairs but no flow10.flo. "
+                f"Make sure you also extracted the GT flow zip (flow10.flo files)."
+            )
+
 
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
     """ Create the data loader for the corresponding trainign set """
@@ -529,6 +616,15 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
             aug_params=aug_params,
             root=getattr(args, "hd1k_root", "../HD1k"),
         )   
+
+    elif args.stage in ("middlebury", "mb"):
+    aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.6, 'do_flip': True}
+    train_dataset = Middlebury(
+        aug_params=aug_params,
+        root=getattr(args, "middlebury_root", "../middlebury"),
+        split=getattr(args, "middlebury_split", "other"),
+        strict=getattr(args, "middlebury_strict", True),
+    )
 
 
     torch.backends.cudnn.deterministic = True

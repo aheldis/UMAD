@@ -463,6 +463,104 @@ def validate_vkitti2(model, iters=12):
     return {"vkitti2-epe": epe_mean, "vkitti2-1px": px1, "vkitti2-3px": px3, "vkitti2-5px": px5}
 
 
+@torch.inference_mode()
+def validate_middlebury(model, iters=12):
+    """Middlebury evaluation with optional corruptions (gaussian/colorjitter/blur)."""
+    model.eval()
+
+    # This assumes you added datasets.Middlebury in core/datasets.py and it returns:
+    #   (img1, img2, flow_gt, valid_gt) for split='other'
+    # and (img1, img2, extra_info) for split='eval'/'test'.
+    val_dataset = datasets.Middlebury(
+        aug_params=None,
+        root=args.middlebury_root,
+        split=args.middlebury_split,
+        strict=args.middlebury_strict,
+    )
+
+    tag = args.corruptions if args.corruptions else "none"
+    max_n = len(val_dataset) if args.max_samples < 0 else min(len(val_dataset), args.max_samples)
+    print(f"Middlebury pairs = {len(val_dataset)} | eval = {max_n} | split={args.middlebury_split} | corruptions={tag}", flush=True)
+
+    # If test/eval split has no GT, just run forward and (optionally) write flows
+    if getattr(val_dataset, "is_test", False):
+        os.makedirs(args.middlebury_output, exist_ok=True)
+        for i in range(max_n):
+            image1, image2, info = val_dataset[i]  # info like (seq, idx)
+            image1 = image1[None].cuda(non_blocking=True)
+            image2 = image2[None].cuda(non_blocking=True)
+
+            image1, image2 = apply_corruptions(image1, image2, args, sample_idx=i)
+            padder = InputPadder(image1.shape)
+            image1, image2 = padder.pad(image1, image2)
+
+            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            flow = padder.unpad(flow_pr[0]).permute(1, 2, 0).cpu().numpy()
+
+            seq = info[0] if isinstance(info, (tuple, list)) and len(info) > 0 else f"seq_{i:04d}"
+            out_dir = os.path.join(args.middlebury_output, seq)
+            os.makedirs(out_dir, exist_ok=True)
+            frame_utils.writeFlow(os.path.join(out_dir, "flow10.flo"), flow)
+
+        print(f"[Middlebury | {tag}] wrote predictions to: {args.middlebury_output}", flush=True)
+        return {}
+
+    # Otherwise: GT available => compute metrics streaming
+    total_epe = 0.0
+    total_px = 0
+    cnt1 = cnt3 = cnt5 = 0
+
+    t0 = time.time()
+    for val_id in range(max_n):
+        image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+
+        image1 = image1[None].cuda(non_blocking=True)
+        image2 = image2[None].cuda(non_blocking=True)
+        flow_gt = flow_gt.cuda(non_blocking=True)
+        if valid_gt is not None:
+            valid_gt = valid_gt.cuda(non_blocking=True)
+
+        # corrupt before resizing/padding
+        image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
+
+        # optional resize (also rescales flow + mask)
+        image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(image1, image2, flow_gt, valid_gt, args.max_side)
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow = padder.unpad(flow_pr[0])  # GPU [2,H,W]
+
+        epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))  # [H,W]
+        if valid_gt is not None:
+            valid_mask = (valid_gt >= 0.5)
+            epe = epe[valid_mask]
+        else:
+            epe = epe.view(-1)
+
+        total_epe += epe.sum().item()
+        total_px += epe.numel()
+        cnt1 += (epe < 1).sum().item()
+        cnt3 += (epe < 3).sum().item()
+        cnt5 += (epe < 5).sum().item()
+
+        if val_id > 0 and (val_id % args.print_freq == 0):
+            elapsed = time.time() - t0
+            sp = elapsed / val_id
+            eta = sp * (max_n - val_id)
+            cur_epe = total_epe / max(total_px, 1)
+            # print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
+
+    epe_mean = total_epe / max(total_px, 1)
+    px1 = cnt1 / max(total_px, 1)
+    px3 = cnt3 / max(total_px, 1)
+    px5 = cnt5 / max(total_px, 1)
+
+    print(f"[Middlebury | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
+    return {"middlebury-epe": epe_mean, "middlebury-1px": px1, "middlebury-3px": px3, "middlebury-5px": px5}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="restore checkpoint")
@@ -504,6 +602,15 @@ if __name__ == '__main__':
     parser.add_argument('--vkitti2_variations', type=str, default='')   # e.g. "clone,fog,rain"
     parser.add_argument('--vkitti2_forward', type=bool, default=True)
     parser.add_argument('--vkitti2_backward', type=bool, default=False)
+
+    # Middlebury
+    parser.add_argument('--middlebury_root', type=str, default='../middlebury')
+    parser.add_argument('--middlebury_split', type=str, default='other',
+                        help="use 'other' for GT, 'eval'/'test' for no-GT")
+    parser.add_argument('--middlebury_strict', action='store_true', default=True,
+                        help='if set, require flow10.flo for GT split')
+    parser.add_argument('--middlebury_output', type=str, default='middlebury_preds',
+                        help='output dir for eval/test split predictions')
 
     # Speed control
     parser.add_argument('--max_samples', type=int, default=-1, help='cap #pairs for fast eval')
@@ -552,10 +659,8 @@ if __name__ == '__main__':
     with ctx:
         if args.dataset == 'nuscenes':
             create_nuscenes_submission(model.module, partition=args.partition)
-
         elif args.dataset == 'jhmdb':
             validate_jhmdb(model.module, iters=24)
-
         elif args.dataset in ('hd1k', 'h1dk', 'H1DK'):
             validate_hd1k(model.module, iters=24)
         elif args.dataset == 'chairs':
@@ -566,4 +671,6 @@ if __name__ == '__main__':
             validate_kitti(model.module)
         elif args.dataset in ('vkitti2', 'vkitti'):
             validate_vkitti2(model.module, iters=24)
+        elif args.dataset in ('middlebury', 'middleburry', 'mb'):
+            validate_middlebury(model.module, iters=24)
 
