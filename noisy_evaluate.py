@@ -561,6 +561,92 @@ def validate_middlebury(model, iters=12):
     return {"middlebury-epe": epe_mean, "middlebury-1px": px1, "middlebury-3px": px3, "middlebury-5px": px5}
 
 
+@torch.inference_mode()
+def validate_tartanair(model, iters=12):
+    """TartanAir evaluation with optional corruptions (gaussian/colorjitter/blur)."""
+    model.eval()
+
+    def _parse_csv(s):
+        s = (s or "").strip()
+        if not s:
+            return None
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+    difficulties = _parse_csv(getattr(args, "tartanair_difficulties", "Easy,Hard")) or ["Easy", "Hard"]
+    envs = _parse_csv(getattr(args, "tartanair_envs", ""))
+    trajectories = _parse_csv(getattr(args, "tartanair_trajectories", ""))
+
+    val_dataset = datasets.TartanAir(
+        aug_params=None,
+        root=args.tartanair_root,
+        difficulties=tuple(difficulties),
+        envs=envs,
+        trajectories=trajectories,
+        use_mask=bool(getattr(args, "tartanair_use_mask", 1)),
+    )
+
+    max_n = len(val_dataset) if args.max_samples < 0 else min(len(val_dataset), args.max_samples)
+    tag = args.corruptions if args.corruptions else "none"
+    print(f"TartanAir pairs = {len(val_dataset)} | eval = {max_n} | corruptions = {tag}", flush=True)
+
+    total_epe = 0.0
+    total_px = 0
+    cnt1 = cnt3 = cnt5 = 0
+
+    t0 = time.time()
+    for val_id in range(max_n):
+        image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+
+        image1 = image1[None].cuda(non_blocking=True)
+        image2 = image2[None].cuda(non_blocking=True)
+        flow_gt = flow_gt.cuda(non_blocking=True)
+        if valid_gt is not None:
+            valid_gt = valid_gt.cuda(non_blocking=True)
+
+        # corrupt before resizing/padding
+        image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
+
+        # optional resize (also rescales flow vectors + mask)
+        image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(
+            image1, image2, flow_gt, valid_gt, args.max_side
+        )
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow = padder.unpad(flow_pr[0])  # GPU [2,H,W]
+
+        epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))  # [H,W]
+
+        if valid_gt is not None:
+            valid_mask = (valid_gt >= 0.5)  # bool mask for indexing
+            epe = epe[valid_mask]
+        else:
+            epe = epe.view(-1)
+
+        total_epe += epe.sum().item()
+        total_px += epe.numel()
+        cnt1 += (epe < 1).sum().item()
+        cnt3 += (epe < 3).sum().item()
+        cnt5 += (epe < 5).sum().item()
+
+        if val_id > 0 and (val_id % args.print_freq == 0):
+            elapsed = time.time() - t0
+            sp = elapsed / val_id
+            eta = sp * (max_n - val_id)
+            cur_epe = total_epe / max(total_px, 1)
+            # print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
+
+    epe_mean = total_epe / max(total_px, 1)
+    px1 = cnt1 / max(total_px, 1)
+    px3 = cnt3 / max(total_px, 1)
+    px5 = cnt5 / max(total_px, 1)
+
+    print(f"[TartanAir | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
+    return {"tartanair-epe": epe_mean, "tartanair-1px": px1, "tartanair-3px": px3, "tartanair-5px": px5}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="restore checkpoint")
@@ -611,6 +697,17 @@ if __name__ == '__main__':
                         help='if set, require flow10.flo for GT split')
     parser.add_argument('--middlebury_output', type=str, default='middlebury_preds',
                         help='output dir for eval/test split predictions')
+
+    # TartanAir
+    parser.add_argument('--tartanair_root', type=str, default='../tartanair')
+    parser.add_argument('--tartanair_difficulties', type=str, default='Easy,Hard',
+                        help="comma-separated, e.g. 'Easy' or 'Easy,Hard'")
+    parser.add_argument('--tartanair_envs', type=str, default='',
+                        help="optional comma-separated env names; empty = all")
+    parser.add_argument('--tartanair_trajectories', type=str, default='',
+                        help="optional comma-separated trajectory ids (e.g., 'P000,P001'); empty = all")
+    parser.add_argument('--tartanair_use_mask', type=int, default=1,
+                        help="1=use provided mask if available, 0=ignore mask")
 
     # Speed control
     parser.add_argument('--max_samples', type=int, default=-1, help='cap #pairs for fast eval')
@@ -673,4 +770,6 @@ if __name__ == '__main__':
             validate_vkitti2(model.module, iters=24)
         elif args.dataset in ('middlebury', 'middleburry', 'mb'):
             validate_middlebury(model.module, iters=24)
+        elif args.dataset in ('tartanair', 'tartan'):
+            validate_tartanair(model.module, iters=24)
 

@@ -556,6 +556,197 @@ class Middlebury(FlowDataset):
             )
 
 
+class TartanAir(FlowDataset):
+    """
+    TartanAir (V1 / tartanair_tools layout) optical flow dataset.
+
+    Expected layout (examples):
+      root/env01/Easy/P001/
+        image_left/000000_left.png
+        image_left/000001_left.png
+        flow/000000_000001_flow.npy    # float32, shape (H,W,2) or (2,H,W)
+        flow/000000_000001_mask.npy    # uint8 mask (0 invalid, >0 valid)
+
+    Notes:
+      - Uses left camera by default (that's what the official tools provide for flow).
+      - Treats flow as "sparse=True" so we can pass valid mask through SparseFlowAugmentor.
+    """
+    def __init__(
+        self,
+        aug_params=None,
+        root="../tartanair",
+        difficulties=("Easy", "Hard"),
+        envs=None,              # None => all env folders under root
+        trajectories=None,      # None => all P* under each difficulty
+        use_mask=True,
+        image_dirname="image_left",
+        flow_dirname="flow",
+        image_exts=("png", "jpg", "jpeg"),
+    ):
+        super(TartanAir, self).__init__(aug_params, sparse=True)
+        self.use_mask = use_mask
+        self.image_exts = tuple(image_exts)
+        self.image_dirname = image_dirname
+        self.flow_dirname = flow_dirname
+
+        root = osp.expanduser(root)
+
+        # --- choose envs ---
+        if envs is None:
+            envs = sorted([d for d in os.listdir(root) if osp.isdir(osp.join(root, d))])
+        else:
+            envs = list(envs)
+
+        difficulties = list(difficulties)
+
+        def _find_image(img_dir, idx_str):
+            # idx_str typically '000000'
+            cands = []
+            for ext in self.image_exts:
+                cands.append(osp.join(img_dir, f"{idx_str}_left.{ext}"))
+                cands.append(osp.join(img_dir, f"{idx_str}.{ext}"))
+            for p in cands:
+                if osp.isfile(p):
+                    return p
+            return None
+
+        # --- index all pairs from flow filenames ---
+        # flow file format: 000000_000001_flow.npy
+        import re
+        pat = re.compile(r"(\d+)_([0-9]+)_flow\.npy$")
+
+        for env in envs:
+            for diff in difficulties:
+                diff_dir = osp.join(root, env, diff)
+                if not osp.isdir(diff_dir):
+                    continue
+
+                # trajectories like P001, P002, ...
+                if trajectories is None:
+                    trajs = sorted([d for d in os.listdir(diff_dir) if osp.isdir(osp.join(diff_dir, d))])
+                else:
+                    trajs = list(trajectories)
+
+                for traj in trajs:
+                    traj_dir = osp.join(diff_dir, traj)
+                    if not osp.isdir(traj_dir):
+                        continue
+
+                    img_dir = osp.join(traj_dir, image_dirname)
+                    flow_dir = osp.join(traj_dir, flow_dirname)
+
+                    # be a bit robust to alternative naming
+                    if not osp.isdir(img_dir):
+                        for alt in ("image_left", "image", "rgb_left", "rgb"):
+                            if osp.isdir(osp.join(traj_dir, alt)):
+                                img_dir = osp.join(traj_dir, alt)
+                                break
+                    if not osp.isdir(flow_dir):
+                        for alt in ("flow", "flow_left"):
+                            if osp.isdir(osp.join(traj_dir, alt)):
+                                flow_dir = osp.join(traj_dir, alt)
+                                break
+
+                    if not osp.isdir(img_dir) or not osp.isdir(flow_dir):
+                        continue
+
+                    flow_files = sorted(glob(osp.join(flow_dir, "*_flow.npy")))
+                    for fp in flow_files:
+                        m = pat.search(fp)
+                        if m is None:
+                            continue
+                        i0, i1 = m.group(1), m.group(2)
+
+                        im0 = _find_image(img_dir, i0)
+                        im1 = _find_image(img_dir, i1)
+                        if im0 is None or im1 is None:
+                            continue
+
+                        self.image_list.append([im0, im1])
+                        self.flow_list.append(fp)
+
+                        if self.use_mask:
+                            mp = fp.replace("_flow.npy", "_mask.npy")
+                            self.extra_info.append((env, diff, traj, i0, i1, mp if osp.isfile(mp) else None))
+                        else:
+                            self.extra_info.append((env, diff, traj, i0, i1, None))
+
+        if len(self.image_list) == 0:
+            raise FileNotFoundError(
+                f"TartanAir: found 0 pairs under root={root}. "
+                f"Expected .../<env>/<Easy|Hard>/<Pxxx>/{image_dirname}/ and /{flow_dirname}/."
+            )
+
+    def __getitem__(self, index):
+        # follow FlowDataset behavior, but custom flow/mask reading (.npy)
+        if self.is_test:
+            img1 = frame_utils.read_gen(self.image_list[index][0])
+            img2 = frame_utils.read_gen(self.image_list[index][1])
+            img1 = np.array(img1).astype(np.uint8)[..., :3]
+            img2 = np.array(img2).astype(np.uint8)[..., :3]
+            img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
+            img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+            return img1, img2, self.extra_info[index]
+
+        if not self.init_seed:
+            worker_info = torch.utils.data.get_worker_info()
+            if worker_info is not None:
+                torch.manual_seed(worker_info.id)
+                np.random.seed(worker_info.id)
+                random.seed(worker_info.id)
+                self.init_seed = True
+
+        index = index % len(self.image_list)
+
+        # --- load images ---
+        img1 = frame_utils.read_gen(self.image_list[index][0])
+        img2 = frame_utils.read_gen(self.image_list[index][1])
+        img1 = np.array(img1).astype(np.uint8)
+        img2 = np.array(img2).astype(np.uint8)
+
+        if len(img1.shape) == 2:
+            img1 = np.tile(img1[..., None], (1, 1, 3))
+            img2 = np.tile(img2[..., None], (1, 1, 3))
+        else:
+            img1 = img1[..., :3]
+            img2 = img2[..., :3]
+
+        # --- load flow (.npy) ---
+        flow_path = self.flow_list[index]
+        flow = np.load(flow_path).astype(np.float32)
+        # allow both (H,W,2) and (2,H,W)
+        if flow.ndim == 3 and flow.shape[0] == 2 and flow.shape[-1] != 2:
+            # (2,H,W) -> (H,W,2)
+            flow = np.transpose(flow, (1, 2, 0))
+        elif flow.ndim != 3 or flow.shape[-1] != 2:
+            raise ValueError(f"TartanAir flow has unexpected shape {flow.shape} at {flow_path}")
+
+        # --- valid mask ---
+        valid = None
+        mask_path = self.extra_info[index][-1] if len(self.extra_info[index]) > 0 else None
+        if self.use_mask and mask_path is not None and osp.isfile(mask_path):
+            mask = np.load(mask_path)
+            # mask is uint8 (0 invalid, >0 valid)
+            valid = (mask > 0).astype(np.float32)
+        else:
+            # valid everywhere, but also drop NaNs/Infs if any
+            valid = np.isfinite(flow[..., 0]) & np.isfinite(flow[..., 1])
+            valid = valid.astype(np.float32)
+
+        # --- augmentation ---
+        if self.augmentor is not None:
+            # sparse=True => SparseFlowAugmentor expects (img1,img2,flow,valid)
+            img1, img2, flow, valid = self.augmentor(img1, img2, flow, valid)
+
+        # --- to torch ---
+        img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
+        img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+        valid = torch.from_numpy(valid).float()
+
+        return img1, img2, flow, valid
+
+
 def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
     """ Create the data loader for the corresponding trainign set """
 
@@ -625,6 +816,17 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
             split=getattr(args, "middlebury_split", "other"),
             strict=getattr(args, "middlebury_strict", True),
         )
+
+    elif args.stage in ('tartanair', 'tartan'):
+    aug_params = {'crop_size': args.image_size, 'min_scale': -0.3, 'max_scale': 0.5, 'do_flip': True}
+    train_dataset = TartanAir(
+        aug_params=aug_params,
+        root=getattr(args, "tartanair_root", "../tartanair"),
+        difficulties=getattr(args, "tartanair_difficulties", ("Easy", "Hard")),
+        envs=getattr(args, "tartanair_envs", None),
+        trajectories=getattr(args, "tartanair_trajectories", None),
+        use_mask=getattr(args, "tartanair_use_mask", True),
+    )
 
 
     torch.backends.cudnn.deterministic = True
