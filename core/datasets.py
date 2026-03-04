@@ -618,13 +618,13 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
         )   
 
     elif args.stage in ("middlebury", "mb"):
-    aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.6, 'do_flip': True}
-    train_dataset = Middlebury(
-        aug_params=aug_params,
-        root=getattr(args, "middlebury_root", "../middlebury"),
-        split=getattr(args, "middlebury_split", "other"),
-        strict=getattr(args, "middlebury_strict", True),
-    )
+        aug_params = {'crop_size': args.image_size, 'min_scale': -0.2, 'max_scale': 0.6, 'do_flip': True}
+        train_dataset = Middlebury(
+            aug_params=aug_params,
+            root=getattr(args, "middlebury_root", "../middlebury"),
+            split=getattr(args, "middlebury_split", "other"),
+            strict=getattr(args, "middlebury_strict", True),
+        )
 
 
     torch.backends.cudnn.deterministic = True
