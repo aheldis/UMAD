@@ -418,7 +418,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--print_freq', type=int, default=500)
 
-    parser.add_argument('--max_side', type=int, default=640,
+    parser.add_argument('--max_side', type=int, default=496,
                     help='Resize so max(H,W)<=max_side for eval. 0 disables.')
 
     args = parser.parse_args()
