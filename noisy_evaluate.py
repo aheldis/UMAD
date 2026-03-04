@@ -15,6 +15,38 @@ from raft import RAFT
 from utils.utils import InputPadder, forward_interpolate
 from demo import *  # if you use viz(), etc.
 
+import torch.nn.functional as F
+
+def _resize_pair_and_flow(img1, img2, flow, valid, max_side: int):
+    # img1,img2: [1,3,H,W] float in [0,255]
+    # flow: [2,H,W], valid: [H,W] or None
+    if max_side <= 0:
+        return img1, img2, flow, valid
+
+    _, _, H, W = img1.shape
+    s = min(1.0, float(max_side) / float(max(H, W)))
+    if s >= 1.0:
+        return img1, img2, flow, valid
+
+    newH, newW = int(round(H * s)), int(round(W * s))
+    img1 = F.interpolate(img1, size=(newH, newW), mode='bilinear', align_corners=False)
+    img2 = F.interpolate(img2, size=(newH, newW), mode='bilinear', align_corners=False)
+
+    # resize flow spatially + scale its magnitude to new pixel units
+    flow_b = flow[None]  # [1,2,H,W]
+    flow_b = F.interpolate(flow_b, size=(newH, newW), mode='bilinear', align_corners=False)
+    sx = newW / float(W)
+    sy = newH / float(H)
+    flow_b[:, 0] *= sx
+    flow_b[:, 1] *= sy
+    flow = flow_b[0]
+
+    if valid is not None:
+        valid = valid[None, None].float()
+        valid = F.interpolate(valid, size=(newH, newW), mode='nearest')[0, 0]
+
+    return img1, img2, flow, valid
+
 
 # -------------------------
 # Corruptions (Gaussian noise / color jitter / blur)
@@ -264,7 +296,7 @@ def validate_jhmdb(model, iters=24):
 
 
 @torch.inference_mode()
-def validate_hd1k(model, iters=24):
+def validate_hd1k(model, iters=12):
     """HD1K evaluation with optional corruptions (gaussian/colorjitter/blur)."""
     model.eval()
 
@@ -290,6 +322,8 @@ def validate_hd1k(model, iters=24):
 
         image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
 
+        image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(image1, image2, flow_gt, valid_gt, args.max_side)
+
         padder = InputPadder(image1.shape)
         image1, image2 = padder.pad(image1, image2)
 
@@ -298,6 +332,7 @@ def validate_hd1k(model, iters=24):
 
         epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))
         if valid_gt is not None:
+            valid_gt = valid_gt >= 0.5
             epe = epe[valid_gt]
         else:
             epe = epe.view(-1)
@@ -382,6 +417,9 @@ if __name__ == '__main__':
     parser.add_argument('--blur_sigma', type=float, default=2.0)
 
     parser.add_argument('--print_freq', type=int, default=500)
+
+    parser.add_argument('--max_side', type=int, default=640,
+                    help='Resize so max(H,W)<=max_side for eval. 0 disables.')
 
     args = parser.parse_args()
 
