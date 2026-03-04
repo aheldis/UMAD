@@ -523,6 +523,13 @@ def fetch_dataloader(args, TRAIN_DS='C+T+K+S+H'):
             variations=getattr(args, "vkitti2_variations", None),  # None => all
         )
 
+    elif args.stage in ('hd1k', 'h1dk', 'HD1K', 'H1DK'):
+        aug_params = {'crop_size': args.image_size, 'min_scale': -0.5, 'max_scale': 0.2, 'do_flip': True}
+        train_dataset = HD1K(
+            aug_params=aug_params,
+            root=getattr(args, "hd1k_root", "../HD1k"),
+        )   
+
 
     torch.backends.cudnn.deterministic = True
     random.seed(1234)
