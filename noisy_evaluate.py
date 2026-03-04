@@ -358,6 +358,110 @@ def validate_hd1k(model, iters=12):
     print(f"[HD1K | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
     return {"hd1k-epe": epe_mean, "hd1k-1px": px1, "hd1k-3px": px3, "hd1k-5px": px5}
 
+@torch.inference_mode()
+def validate_vkitti2(model, iters=12):
+    """VKITTI2 evaluation with optional corruptions (gaussian/colorjitter/blur)."""
+    model.eval()
+
+    # Parse optional filters
+    scenes = None
+    if getattr(args, "vkitti2_scenes", ""):
+        scenes = tuple(s.strip() for s in args.vkitti2_scenes.split(",") if s.strip())
+
+    variations = None
+    if getattr(args, "vkitti2_variations", ""):
+        variations = [s.strip() for s in args.vkitti2_variations.split(",") if s.strip()]
+
+    camera = getattr(args, "vkitti2_camera", "Camera_0")
+    root = getattr(args, "vkitti2_root", "../VKITTI2")
+    include_forward = getattr(args, "vkitti2_forward", True)
+    include_backward = getattr(args, "vkitti2_backward", True)
+
+    # Build dataset
+    if scenes is None:
+        val_dataset = datasets.VirtualKITTI2(
+            aug_params=None,
+            root=root,
+            camera=camera,
+            include_forward=include_forward,
+            include_backward=include_backward,
+            variations=variations
+        )
+    else:
+        val_dataset = datasets.VirtualKITTI2(
+            aug_params=None,
+            root=root,
+            scenes=scenes,
+            camera=camera,
+            include_forward=include_forward,
+            include_backward=include_backward,
+            variations=variations
+        )
+
+    max_n = len(val_dataset) if args.max_samples < 0 else min(len(val_dataset), args.max_samples)
+    tag = args.corruptions if args.corruptions else "none"
+    print(f"VKITTI2 pairs = {len(val_dataset)} | eval = {max_n} | corruptions = {tag} | camera={camera}", flush=True)
+
+    total_epe = 0.0
+    total_px = 0
+    cnt1 = cnt3 = cnt5 = 0
+
+    t0 = time.time()
+    for val_id in range(max_n):
+        image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+
+        image1 = image1[None].cuda(non_blocking=True)
+        image2 = image2[None].cuda(non_blocking=True)
+        flow_gt = flow_gt.cuda(non_blocking=True)
+
+        # valid_gt is float mask in your datasets; keep as float until final boolean thresholding
+        if valid_gt is not None:
+            valid_gt = valid_gt.cuda(non_blocking=True)
+
+        # apply corruptions BEFORE resizing/padding
+        image1, image2 = apply_corruptions(image1, image2, args, sample_idx=val_id)
+
+        # optional resize (also rescales flow vectors + mask)
+        image1, image2, flow_gt, valid_gt = _resize_pair_and_flow(
+            image1, image2, flow_gt, valid_gt, args.max_side
+        )
+
+        padder = InputPadder(image1.shape)
+        image1, image2 = padder.pad(image1, image2)
+
+        _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow = padder.unpad(flow_pr[0])  # GPU [2,H,W]
+
+        epe = torch.sqrt(((flow - flow_gt) ** 2).sum(dim=0))  # [H,W]
+
+        if valid_gt is not None:
+            # ensure boolean mask for indexing
+            valid_mask = (valid_gt >= 0.5)
+            epe = epe[valid_mask]
+        else:
+            epe = epe.view(-1)
+
+        total_epe += epe.sum().item()
+        total_px += epe.numel()
+        cnt1 += (epe < 1).sum().item()
+        cnt3 += (epe < 3).sum().item()
+        cnt5 += (epe < 5).sum().item()
+
+        if val_id > 0 and (val_id % args.print_freq == 0):
+            elapsed = time.time() - t0
+            sp = elapsed / val_id
+            eta = sp * (max_n - val_id)
+            cur_epe = total_epe / max(total_px, 1)
+            # print(f"[{val_id}/{max_n}] EPE={cur_epe:.4f} | {sp:.3f}s/sample | ETA~{eta/60:.1f} min", flush=True)
+
+    epe_mean = total_epe / max(total_px, 1)
+    px1 = cnt1 / max(total_px, 1)
+    px3 = cnt3 / max(total_px, 1)
+    px5 = cnt5 / max(total_px, 1)
+
+    print(f"[VKITTI2 | {tag}] EPE: {epe_mean:.6f}, 1px: {px1:.6f}, 3px: {px3:.6f}, 5px: {px5:.6f}", flush=True)
+    return {"vkitti2-epe": epe_mean, "vkitti2-1px": px1, "vkitti2-3px": px3, "vkitti2-5px": px5}
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -393,7 +497,13 @@ if __name__ == '__main__':
 
     # HD1K root
     parser.add_argument('--hd1k_root', type=str, default='../HD1k')
-    parser.add_argument('--image_size', type=int, nargs='+', default=[640, 270])
+
+    parser.add_argument('--vkitti2_root', type=str, default='../VKITTI2')
+    parser.add_argument('--vkitti2_camera', type=str, default='Camera_0')
+    parser.add_argument('--vkitti2_scenes', type=str, default='')       # e.g. "Scene01,Scene02"
+    parser.add_argument('--vkitti2_variations', type=str, default='')   # e.g. "clone,fog,rain"
+    parser.add_argument('--vkitti2_forward', type=bool, default=True)
+    parser.add_argument('--vkitti2_backward', type=bool, default=False)
 
     # Speed control
     parser.add_argument('--max_samples', type=int, default=-1, help='cap #pairs for fast eval')
@@ -454,4 +564,6 @@ if __name__ == '__main__':
             validate_sintel(model.module, train=False)
         elif args.dataset == 'kitti':
             validate_kitti(model.module)
+        elif args.dataset in ('vkitti2', 'vkitti'):
+            validate_vkitti2(model.module, iters=24)
 
